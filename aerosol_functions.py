@@ -321,6 +321,144 @@ def dNdlogDp2dN(Dp,dNdlogDp):
 
     return dNdlogDp*dlogDp # dNdlogDp -> dN
 
+
+def calc_CoagS(diam,time,Dp,dNdlogDp,temp,pres):
+    """Calculate the coagualtion sink for particles size diam
+
+    ARGUMENTS:
+    ----------
+
+    diam: float
+        Particle diameter for which you want to calculate the CoagS
+        unit: meters
+
+    time: 1-d array, size n
+        time in the data, unit: days
+        unit : days
+
+    Dp: 1-d array, size m
+        diameter in the data, unit: meters
+        unit : m
+
+    dNdlogDp: 2-d array, size n,m
+        dN/dlogDp matrix
+        unit : cm-3
+
+    temp: 1-d array, size n
+        Ambient temperature corresponding to the data
+        unit : K
+
+    pres: 1-d array, size n
+        Ambient pressure corresponding to the data
+        unit : Pa
+
+    RETURNS: 
+    --------
+    
+    CoagS: 1-d array, size n
+        Coagulation sink time series
+        unit s-1
+
+    """
+    
+    N = dNdlogDp2dN(Dp,dNdlogDp) # cm-3
+    
+    findex = np.argwhere(Dp>=diam).flatten()
+    big_R = Dp[findex]/2.
+    big_N = N[:,findex]
+    k_B = 1.38064852e-23 # Boltzmann constant m2 kg s-2 K-1
+    r0=diam/2.
+    r1=r0
+    dens=1000.
+    CoagS=np.zeros(time.shape)
+    for i in range(0,len(time)):
+        lamda=(6.73e-8*temp[i]*(1+(110.4/temp[i])))/(296*pres[i]/101325.0*1.373)
+        myy=(1.832e-5*(temp[i]**(1.5))*406.4)/(5093*(temp[i]+110.4))
+        kn1=lamda/r1
+        kn=lamda/big_R
+        CC= 1.+(kn*(1.142+(0.558*np.exp((-.999)/kn))))
+        CC1= 1. + (kn1*(1.142+(0.558*np.exp((-.999)/kn1))))
+        D = (k_B*temp[i]*CC)/(6.*np.pi*myy*big_R)
+        D1 = (k_B*temp[i]*CC1)/(6.*np.pi*myy*r1)
+        M = 4./3.*np.pi*(big_R**3)*dens
+        M1 = 4./3.*np.pi*(r1**3)*dens
+        c= np.sqrt((8.*k_B*temp[i])/(np.pi*M))
+        c1= np.sqrt((8.*k_B*temp[i])/(np.pi*M1))
+        c12= np.sqrt((c**2)+(c1**2))
+        r12= big_R+r1
+        D12= D+D1 
+        CCONT = 4.*np.pi*r12*D12
+        CFR = np.pi*r12*r12*c12
+        L=(8.*D)/(np.pi*c)
+        L1=(8.*D1)/(np.pi*c1)
+        SIG=(1./(3.*r12*L))*((r12+L)**3-(r12*r12+L*L)**1.5)-r12
+        SIG1=(1./(3.*r12*L1))*((r12+L1)**3-(r12*r12+L1*L1)**1.5)-r12
+        SIG12= np.sqrt((SIG**2)+(SIG1**2))
+        KO=CCONT/((r12/(r12+SIG12))+(CCONT/CFR))
+        CoagS[i] = np.nansum(KO*big_N[i,:]*1e6)
+        if (r0==big_R[0]):
+            CoagS[i] = 0.5*KO*big_N[i,0]*1e6+np.nansum(KO*big_N[i,1:]*1e6)
+        else:
+            CoagS[i] = np.nansum(KO*big_N[i,:]*1e6)
+ 
+    return CoagS
+
+def calc_CS(time, Dp, dNdlogDp, temp, pres):
+    """ Calculate CS from aerosol size distribution
+
+    ARGUMENTS:
+    ----------
+   
+    time: 1-d array, size n
+        unit: days
+
+    Dp: 1-d array, size m
+        unit m
+
+    dNdlogDp: 2-d array, size n,m
+      dN/dlogDp matrix, unit: cm-3
+
+    temp: 1-d array, size n
+        unit: K
+
+    pres: 1-d array, size n
+        unit: Pa
+
+
+    RETURNS:
+    --------
+
+    CS: 1-d array, size n
+        unit s-1
+
+    """
+
+    Mx=98.08
+    Mair=28.965
+    Pr=pres/101325.
+    Dair=19.7
+    Dx=51.96
+    k = 8314.7
+    R = Dp/2.0
+
+    Temp = temp
+
+    CS = np.nan * np.ones(time.shape)
+
+    for i in range(len(time)):
+        Dif = (0.001 * (Temp[i]**1.75)*np.sqrt( (1./Mair)+(1./Mx))) / (Pr[i]*(Dair**(1./3.)+Dx**(1./3.))**2)            
+
+        lam=3.*(np.sqrt( (np.pi*Mx)/(8.*k*Temp[i]) )) * Dif *1e-4
+            
+        knud=lam/R;
+            
+        beta=(knud+1)/((0.377*knud)+1+(4/(3.*1.))*(knud**2)+(4/(3.*1))*knud)
+
+        CS[i] = np.nansum((4.*np.pi*Dif)*dNdlogDp[i,:]*beta*R*1e2)
+
+    return CS
+
+
 def calc_concentration(v,dmin,dmax):
     """ Calculate particle number concentration from aerosol number-size distribution
 
