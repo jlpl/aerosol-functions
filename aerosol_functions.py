@@ -37,7 +37,7 @@ def find_index(values, vector):
             minind[ii]=diff.argmin()
     return minind.astype(int)
 
-def bin1d(x, y, step_x, bin_minmax=None, ppb=1, method='median'):
+def bin1d(x, y, step_x, bin_minmax=None, ppb=1, method='median', dropnans=False):
     """ 1-d binning
     
         Parameters:
@@ -62,12 +62,16 @@ def bin1d(x, y, step_x, bin_minmax=None, ppb=1, method='median'):
         method: str
             'median' returns the 25th, 50th and 75th percentiles for each bin 
             'mean' returns the mean and the standard deviation for each bin
+
+        dropnans: bool
+            If True it drops data rows that contain all NaN
+            If False the all NaN are kept
     
         Returns:
         --------
 
         final_x: 1-d array (size k)
-            Bin centers    
+            Leading edges of bins    
 
         final_25,final_50,final_75: (2-d arrays, size: k,m)
             If method was median, these are the corresponding
@@ -116,7 +120,16 @@ def bin1d(x, y, step_x, bin_minmax=None, ppb=1, method='median'):
                 data_std[i,:] = np.nanstd(y_block,axis=0)
                 findex.append(i)
         else: # not enough data was found in the bin
-            continue
+            if dropnans==True:
+                continue
+            if method=='median':
+                data_25[i,:],data_50[i,:],data_75[i,:]=np.nan,np.nan,np.nan
+                findex.append(i)
+            if method=='mean':
+                data_mean[i,:] = np.nan
+                data_std[i,:] = np.nan
+                findex.append(i)
+
     
     final_x = data_x[findex]
 
@@ -261,6 +274,13 @@ def plot_sumfile(handle,v,cbar=True,clim=(10,100000),cmap='jet',shading='flat',c
         return pcolorplot
 
 def plot_sumfile2(handle,time,dp,data,clim=(10,100000),cmap='jet',shading='flat',cbar=True,cbar_padding=0.05):
+    """ Plot UHEL's sum-formatted aerosol number-size distribution 
+    
+    Same as plot_sumfile() but time, dp and data
+    are given as separate inputs.
+
+    """
+    
 
     mesh_dp,mesh_time = np.meshgrid(dp,time)
     pcolorplot = handle.pcolormesh(mesh_time,mesh_dp,data,
@@ -471,7 +491,6 @@ def calc_concentration(v,dmin,dmax):
         time (1-D array): corresponding time points
     """
 
-    time = v[1:,0]
     dp = np.log10(v[0,2:])
     conc = v[1:,2:]
     dmin = np.nanmax((np.log10(dmin),dp[0]))
@@ -481,6 +500,12 @@ def calc_concentration(v,dmin,dmax):
     return conci
 
 def calc_concentration2(dp,data,dmin,dmax):
+    """ Calculate particle number concentration from aerosol number-size distribution
+    
+    Same as calc_concentration() but take the dp and data
+    as separate inputs.
+    """
+
     dp = np.log10(dp)
     dmin = np.max((np.log10(dmin),dp[0]))
     dmax = np.min((np.log10(dmax),dp[-1]))
