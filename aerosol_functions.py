@@ -492,12 +492,16 @@ def calc_concentration(v,dmin,dmax):
     """
 
     dp = np.log10(v[0,2:])
-    conc = v[1:,2:]
-    dmin = np.nanmax((np.log10(dmin),dp[0]))
-    dmax = np.nanmin((np.log10(dmax),dp[-1]))
-    dpi = np.arange(dmin,dmax,0.001)
-    conci = np.nansum(interp1d(dp,conc,kind='nearest')(dpi)*0.001,axis=1)
-    return conci
+    conc = v[1:,2:] 
+    findex = np.argwhere((dp<=dmax)&(dp>=dmin)).flatten()
+    dp = dp[findex]
+    conc = data[:,findex]
+    logdp_mid = np.log10(dp)
+    logdp = (logdp_mid[:-1]+logdp_mid[1:])/2.0
+    logdp = np.append(logdp,logdp_mid.max()+(logdp_mid.max()-logdp.max()))
+    logdp = np.insert(logdp,0,logdp_mid.min()-(logdp.min()-logdp_mid.min()))
+    dlogdp = np.diff(logdp)
+    return np.nansum(conc*dlogdp,axis=1)
 
 def calc_concentration2(dp,data,dmin,dmax):
     """ Calculate particle number concentration from aerosol number-size distribution
@@ -505,13 +509,16 @@ def calc_concentration2(dp,data,dmin,dmax):
     Same as calc_concentration() but take the dp and data
     as separate inputs.
     """
-
-    dp = np.log10(dp)
-    dmin = np.max((np.log10(dmin),dp[0]))
-    dmax = np.min((np.log10(dmax),dp[-1]))
-    dpi = np.arange(dmin,dmax,0.001)
-    conci = np.sum(interp1d(dp,data,kind='nearest')(dpi)*0.001,axis=1)
-    return conci
+    
+    findex = np.argwhere((dp<=dmax)&(dp>=dmin)).flatten()
+    dp = dp[findex]
+    conc = data[:,findex]
+    logdp_mid = np.log10(dp)
+    logdp = (logdp_mid[:-1]+logdp_mid[1:])/2.0
+    logdp = np.append(logdp,logdp_mid.max()+(logdp_mid.max()-logdp.max()))
+    logdp = np.insert(logdp,0,logdp_mid.min()-(logdp.min()-logdp_mid.min()))
+    dlogdp = np.diff(logdp)
+    return np.nansum(conc*dlogdp,axis=1)
 
 def cunn(Dp):
     """ Cunningham correction factor Makela et al. (1996) """
