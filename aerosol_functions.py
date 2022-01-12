@@ -111,6 +111,10 @@ def bin1d(x, y, step_x, bin_minmax=None, ppb=1, method='median', dropnans=False)
     
     for i in range(0,len(data_x)):
         y_block = y[((x>temp_x[i]) & (x<=temp_x[i+1])),:]
+
+        # Turn infs into nans
+        y_block[np.isinf(y_block)] = np.nan
+
         if len(y_block)>=ppb: # more than ppb amount of data was found in the bin
             if method=='median':
                 data_25[i,:],data_50[i,:],data_75[i,:] = np.nanpercentile(y_block,[25,50,75],axis=0)
@@ -210,6 +214,9 @@ def bin2d(z, x, y, step_x, step_y, minmax_x=None, minmax_y=None, ppb=1):
     for i in range(0,len(data_x)):
         for j in range(0,len(data_y)):
             z_block = z[(((x>temp_x[i]) & (x<=temp_x[i+1])) & ((y>temp_y[j]) & (y<=temp_y[j+1])))]
+            
+            z_block[np.isinf(z_block)] = np.nan
+
             if len(z_block)>=ppb: # data was found in the bin
                 data_25[i,j],data_50[i,j],data_75[i,j] = np.nanpercentile(z_block,[25,50,75])
             else: # not enough data was foud in the bin
