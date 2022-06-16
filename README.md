@@ -1,9 +1,7 @@
-# Aerosol Functions
+A collection of functions to analyze atmospheric aerosol data.
 
-## Installation
-
-## Documentation
-
-## Example usage
-
-## License 
+Use [pip](https://pip.pypa.io/en/stable/) to install the package
+```
+pip install aerosol-functions
+```
+Documentation can be found [here](https://jlpl.github.io/aerosol-functions/).

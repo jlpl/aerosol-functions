@@ -1,0 +1,2 @@
+recursive-include docs *.html
+recursive-include docs *.js
