@@ -460,13 +460,12 @@ def mob2diam(Zp,temp,pres,ne):
     ne : integer
         number of charges on the aerosol particle
 
-    Returns 
+    Returns
     -------
 
     float or numpy 1d array
-        particle diameter(s), 
-        unit: m
-
+        particle diameter(s), unit: m
+    
     """
 
     def minimize_this(dp,Z):
@@ -520,8 +519,6 @@ def binary_diffusivity(temp,pres,Ma,Mb,Va,Vb):
 
     """
     
-    # convert pressure to atmospheres
-
     diffusivity = (1.013e-2*(temp**1.75)*np.sqrt((1./Ma)+(1./Mb)))/(pres*(Va**(1./3.)+Vb**(1./3.))**2)
     return diffusivity
 
