@@ -12,6 +12,93 @@ from datetime import datetime, timedelta
 from scipy.optimize import minimize
 from collections.abc import Iterable
 
+def bin1d(x, y, step_x, bin_minmax=None, ppb=1):
+    """ Utility function for binning data
+
+    Parameters
+    ----------
+
+    x : 1-d array of size n
+        1-d array along which the bins are calculated.
+
+    y : 1-d array of size n or 2-d array of size (n,m)
+        2-d array with m columns, the rows correspond to values in `x`
+
+    step_x : float, pandas time frequency alias (str)
+        resolution, or distance between bin centers.  
+        
+        if `x` is array of datetime objects use the 
+        pandas time frequency alias to set the resolution. 
+
+    bin_minmax : iterable with two values
+        center of smallest and larges bin, optional
+
+    ppb : int
+        number of values per bin, if bin has too few values then it will
+        be `NaN`.
+
+    Returns
+    -------
+
+    1-d array of size k
+        bin centers
+
+    1-d array of size k or 2-d array of size (k,m)
+        median values in the bins
+
+    1-d array of size k or 2-d array of size (k,m)
+        25th percentile values in the bins
+
+    1-d array of size k or 2-d array of size (k,m)
+        75th percentile values in the bins
+
+    """
+
+    # By default use the minimum and maximum values as the limits
+    if bin_minmax==None:
+        bin_minmax=np.ones(2)
+        bin_minmax[0]=np.nanmin(x)
+        bin_minmax[1]=np.nanmax(x)
+
+    if isinstance(x[0],datetime):
+        temp_x = pd.date_range(start=bin_minmax[0], end=bin_minmax[1], freq=step_x)
+    else:
+        temp_x = np.arange(bin_minmax[0], bin_minmax[1]+step_x, step_x)
+
+    data_x = (temp_x[:-1] + temp_x[1:])/2.
+
+    if len(y.shape)==1:
+        data_25 = np.nan*np.ones(len(data_x))
+        data_50 = np.nan*np.ones(len(data_x))
+        data_75 = np.nan*np.ones(len(data_x))
+
+        for i in range(0,len(data_x)):
+    
+            y_block = y[((x>temp_x[i]) & (x<=temp_x[i+1]))]
+            y_block[np.isinf(y_block)] = np.nan
+    
+            if len(y_block)>=ppb:
+                data_25[i],data_50[i],data_75[i] = np.nanpercentile(y_block,[25,50,75],axis=0)
+            else:
+                continue
+
+    else:
+        data_25 = np.nan*np.ones((len(data_x),y.shape[1]))
+        data_50 = np.nan*np.ones((len(data_x),y.shape[1]))
+        data_75 = np.nan*np.ones((len(data_x),y.shape[1]))
+
+        for i in range(0,len(data_x)):
+    
+            y_block = y[((x>temp_x[i]) & (x<=temp_x[i+1])),:]
+            y_block[np.isinf(y_block)] = np.nan
+    
+            if len(y_block)>=ppb:
+                data_25[i,:],data_50[i,:],data_75[i,:] = np.nanpercentile(y_block,[25,50,75],axis=0)
+            else:
+                continue
+
+    return data_x, data_50, data_25, data_75
+
 def plot_sumfile(
     ax,
     time,
