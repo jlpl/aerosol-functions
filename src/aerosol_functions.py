@@ -6,13 +6,73 @@ aerosol data.
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
+import matplotlib.dates as dts
 from matplotlib.ticker import LogLocator
 from matplotlib import colors
 from datetime import datetime, timedelta
 from scipy.optimize import minimize
 from collections.abc import Iterable
 
-def bin1d(x, y, step_x, bin_minmax=None, ppb=1):
+def datenum2datetime(datenum):
+    """
+    Convert from matlab datenum to python datetime 
+
+    Parameters
+    ----------
+
+    datenum : float or array of floats
+        A serial date number representing the whole and 
+        fractional number of days from 1-Jan-0000 to a 
+        specific date (MATLAB datenum)
+
+    Returns
+    -------
+
+    datetime or array of datetimes
+
+    """
+
+    if (isinstance(datenum,Iterable)):
+        return np.array([datetime.fromordinal(int(x)) + timedelta(days=x%1) - timedelta(days = 366) for x in datenum])
+    else:
+        return datetime.fromordinal(int(datenum)) + timedelta(days=datenum%1) - timedelta(days = 366)
+
+def datetime2datenum(dt):
+    """ 
+    Convert from python datetime to matlab datenum 
+
+    Parameters
+    ----------
+
+    datetime or array of datetimes
+
+    Returns
+    -------
+
+    float or array of floats
+        A serial date number representing the whole and 
+        fractional number of days from 1-Jan-0000 to a 
+        specific date (MATLAB datenum)
+
+    """
+
+    if (isinstance(dt,Iterable)):
+        out=[]
+        for t in dt:
+            ord = t.toordinal()
+            mdn = t + timedelta(days = 366)
+            frac = (t-datetime(t.year,t.month,t.day,0,0,0)).seconds \
+                   / (24.0 * 60.0 * 60.0)
+            out.append(mdn.toordinal() + frac)
+        return np.array(out)
+    else:
+        ord = dt.toordinal()
+        mdn = dt + timedelta(days = 366)
+        frac = (dt-datetime(dt.year,dt.month,dt.day,0,0,0)).seconds \
+               / (24.0 * 60.0 * 60.0)
+        return mdn.toordinal() + frac
+
+def bin1d(x, y, step_x, min_bin=None, max_bin=None, ppb=1):
     """ Utility function for binning data
 
     Parameters
@@ -24,14 +84,14 @@ def bin1d(x, y, step_x, bin_minmax=None, ppb=1):
     y : 1-d array of size n or 2-d array of size (n,m)
         2-d array with m columns, the rows correspond to values in `x`
 
-    step_x : float, pandas time frequency alias (str)
+    step_x : float
         resolution, or distance between bin centers.  
-        
-        if `x` is array of datetime objects use the 
-        pandas time frequency alias to set the resolution. 
 
-    bin_minmax : iterable with two values
-        center of smallest and larges bin, optional
+    min_bin : float
+        lower edge of minimum bin
+
+    max_bin : float
+        upper edge of maximum bin
 
     ppb : int
         number of values per bin, if bin has too few values then it will
@@ -55,15 +115,12 @@ def bin1d(x, y, step_x, bin_minmax=None, ppb=1):
     """
 
     # By default use the minimum and maximum values as the limits
-    if bin_minmax==None:
-        bin_minmax=np.ones(2)
-        bin_minmax[0]=np.nanmin(x)
-        bin_minmax[1]=np.nanmax(x)
+    if min_bin is None:
+        min_bin=np.nanmin(x)
+    if max_bin is None:
+        max_bin=np.nanmax(x)
 
-    if isinstance(x[0],datetime):
-        temp_x = pd.date_range(start=bin_minmax[0], end=bin_minmax[1], freq=step_x)
-    else:
-        temp_x = np.arange(bin_minmax[0], bin_minmax[1]+step_x, step_x)
+    temp_x = np.arange(min_bin, max_bin+step_x, step_x)
 
     data_x = (temp_x[:-1] + temp_x[1:])/2.
 
@@ -99,27 +156,44 @@ def bin1d(x, y, step_x, bin_minmax=None, ppb=1):
 
     return data_x, data_50, data_25, data_75
 
+def generate_log_ticks():
+    """
+    Generate ticks and ticklabels for log axis
+    """
+    x=np.arange(1,10)
+    y=np.arange(-10,-4).astype(float)
+    log_ticks=[]
+    log_tick_labels=[]
+    for j in y:
+        for i in x:
+            log_ticks.append(np.log10(np.round(i*10**j,int(np.abs(j)))))
+            if i==1:
+                log_tick_labels.append("10$^{%d}$"%j)
+            else:
+                log_tick_labels.append('')
+
+    log_ticks=np.array(log_ticks)
+    return log_ticks,log_tick_labels
+
 def plot_sumfile(
-    ax,
     time,
     dp,
     dndlogdp,
-    clim=(10,100000),
-    cmap='jet',
-    cscale='log',
-    cbar=True,
-    cbar_padding=0.05):    
+    ax=None,
+    vmin=10,
+    vmax=100000,
+    cmap='turbo',
+    interp='none',
+    time_reso=2,
+    time_formatter="%H:%M"):    
     """ 
-    Plot aerosol number-size distribution surface plot
+    Plot aerosol particle number-size distribution surface plot
 
     Parameters
     ----------
 
-    ax : axes object
-        axis on which to plot the data
-
     time : numpy 1d array, size n
-        measurement times
+        measurement times (MATLAB datenum)
 
     dp : numpy 1d array, size m 
         particle diameters
@@ -127,66 +201,73 @@ def plot_sumfile(
     dndlogdp : numpy 2d array, size (n,m)
         number-size distribution matrix
 
+    ax : axes object
+        axis on which to plot the data
+        if `None` the axis are created.
+
+    vmin : float or int
+        color scale lower limit
+
+    vmax : float or int
+        color scale upper limit
+
     clim : iterable with two numerical elements
         color limits
 
-    cmap : str 
+    cmap : `str`
         colormap to be used
 
-    cscale : str         
-        type of color scale `log` or `linear`
-        
-    cbar : boolean
-        plot colorbar `True` or `False`
-    
-    cbar_padding : float
-        Control space between colorbar and axes
-    
-    Returns
-    -------
+    interp : `str`
+        interpolation method passed to imshow, default `'none'`
 
-    matplotlib.collections.QuadMesh
-        
-    Colorbar
-        only if cbar is `True`
+    time_reso : `int`
+        Resolution on the time axis given in hours
+
+    time_formatter : `str`
+        Define the format of time ticklabels
 
     """
-    
-    mesh_dp,mesh_time = np.meshgrid(dp,time)
 
-    if cscale=='log':
-        norm = colors.LogNorm()
-        ticks = LogLocator(subs=range(10))
-    elif cscale=='linear':
-        norm = None
-        ticks = None
+    if ax is None:
+        fig,handle = plt.subplots()
     else:
-        raise Exception('"cscale" must be "log" or "linear"') 
+        handle=ax
 
-    pcolorplot = ax.pcolormesh(
-        mesh_time,
-        mesh_dp,
-        dndlogdp,
+    log_ticks,log_tick_labels = generate_log_ticks()
+
+    norm = colors.LogNorm(vmin=vmin,vmax=vmax)
+    color_ticks = LogLocator(subs=range(10))
+
+    handle.set_yticks(log_ticks)
+    handle.set_yticklabels(log_tick_labels)
+
+    t1=dts.date2num(datenum2datetime(time.min()))
+    t2=dts.date2num(datenum2datetime(time.max()))
+
+    img = handle.imshow(
+        np.flipud(dndlogdp.T),
+        origin="upper",
+        aspect="auto",
+        interpolation=interp,
+        cmap=cmap,
         norm=norm,
-        linewidth=0,
-        rasterized=True,
-        cmap=cmap)
+        extent=(t1,t2,np.log10(dp.min()),np.log10(dp.max()))
+    )
 
-    pcolorplot.set_clim(clim)
-    ax.set_yscale('log')
-    ax.autoscale(tight='true')
-    ax.grid(which="both",c='k',ls=':',alpha=0.5)
+    handle.xaxis.set_major_locator(dts.HourLocator(interval=time_reso))
+    handle.xaxis.set_major_formatter(dts.DateFormatter(time_formatter))
+    plt.setp(handle.get_xticklabels(),rotation=80)
 
-    if cbar:
-        cbar_ax = plt.colorbar(
-            pcolorplot,
-            ax=ax,
-            pad=cbar_padding,
-            ticks=ticks)
-        return pcolorplot, cbar_ax
-    else:
-        return pcolorplot
+    box = handle.get_position()
+    c_handle = plt.axes([box.x0*1.025 + box.width * 1.025, box.y0, 0.01, box.height])
+    cbar = plt.colorbar(img,cax=c_handle,ticks=color_ticks)
 
+    handle.set_ylabel('Dp, [m]')
+    handle.set_xlabel('Time')
+    cbar.set_label('dN/dlogDp, [cm-3]')
+
+    if ax is None:
+        plt.show()
 
 def dndlogdp2dn(dp,dndlogdp):
     """    
@@ -875,62 +956,3 @@ def calc_ion_formation_rate(
     neg_formation_rate = neg_conc_term + neg_sink_term + neg_gr_term + neg_recombination_term - neg_charging_term
 
     return pos_formation_rate, neg_formation_rate
-
-def datenum2datetime(datenum):
-    """
-    Convert from matlab datenum to python datetime 
-
-    Parameters
-    ----------
-
-    datenum : float or array of floats
-        A serial date number representing the whole and 
-        fractional number of days from 1-Jan-0000 to a 
-        specific date (MATLAB datenum)
-
-    Returns
-    -------
-
-    datetime or array of datetimes
-
-    """
-
-    if (isinstance(datenum,Iterable)):
-        return np.array([datetime.fromordinal(int(x)) + timedelta(days=x%1) - timedelta(days = 366) for x in datenum])
-    else:
-        return datetime.fromordinal(int(datenum)) + timedelta(days=datenum%1) - timedelta(days = 366)
-
-def datetime2datenum(dt):
-    """ 
-    Convert from python datetime to matlab datenum 
-
-    Parameters
-    ----------
-
-    datetime or array of datetimes
-
-    Returns
-    -------
-
-    float or array of floats
-        A serial date number representing the whole and 
-        fractional number of days from 1-Jan-0000 to a 
-        specific date (MATLAB datenum)
-
-    """
-
-    if (isinstance(dt,Iterable)):
-        out=[]
-        for t in dt:
-            ord = t.toordinal()
-            mdn = t + timedelta(days = 366)
-            frac = (t-datetime(t.year,t.month,t.day,0,0,0)).seconds \
-                   / (24.0 * 60.0 * 60.0)
-            out.append(mdn.toordinal() + frac)
-        return np.array(out)
-    else:
-        ord = dt.toordinal()
-        mdn = dt + timedelta(days = 366)
-        frac = (dt-datetime(dt.year,dt.month,dt.day,0,0,0)).seconds \
-               / (24.0 * 60.0 * 60.0)
-        return mdn.toordinal() + frac
