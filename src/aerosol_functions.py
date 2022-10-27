@@ -9,33 +9,38 @@ import matplotlib.pyplot as plt
 import matplotlib.dates as dts
 from matplotlib.ticker import LogLocator
 from matplotlib import colors
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from scipy.optimize import minimize
-from collections.abc import Iterable
+from scipy.integrate import trapezoid
 
-def datenum2datetime(datenum):
+def datenum2datetime(datenum,tz=None):
     """
     Convert from matlab datenum to python datetime 
 
     Parameters
     ----------
 
-    datenum : float or array of floats
+    datenum : `float`
         A serial date number representing the whole and 
         fractional number of days from 1-Jan-0000 to a 
         specific date (MATLAB datenum)
+  
+    tz : `int` or `None`
+        Timezone offset in minutes from UTC
+        `None` implies timezone unaware
 
     Returns
     -------
 
-    datetime or array of datetimes
+    `pandas.Timestamp`
 
     """
+    dt = (datetime.fromordinal(int(datenum)) + timedelta(days=datenum%1) - timedelta(days = 366))
+    if tz is not None:
+        tz_offset = timezone(timedelta(minutes=tz))
+        dt = dt.replace(tzinfo=tz_offset)
 
-    if (isinstance(datenum,Iterable)):
-        return np.array([datetime.fromordinal(int(x)) + timedelta(days=x%1) - timedelta(days = 366) for x in datenum])
-    else:
-        return datetime.fromordinal(int(datenum)) + timedelta(days=datenum%1) - timedelta(days = 366)
+    return pd.to_datetime(dt.isoformat())
 
 def datetime2datenum(dt):
     """ 
@@ -44,124 +49,103 @@ def datetime2datenum(dt):
     Parameters
     ----------
 
-    datetime or array of datetimes
+    dt : datetime object
 
     Returns
     -------
 
-    float or array of floats
+    float
         A serial date number representing the whole and 
         fractional number of days from 1-Jan-0000 to a 
         specific date (MATLAB datenum)
 
     """
 
-    if (isinstance(dt,Iterable)):
-        out=[]
-        for t in dt:
-            ord = t.toordinal()
-            mdn = t + timedelta(days = 366)
-            frac = (t-datetime(t.year,t.month,t.day,0,0,0)).seconds \
-                   / (24.0 * 60.0 * 60.0)
-            out.append(mdn.toordinal() + frac)
-        return np.array(out)
-    else:
-        ord = dt.toordinal()
-        mdn = dt + timedelta(days = 366)
-        frac = (dt-datetime(dt.year,dt.month,dt.day,0,0,0)).seconds \
-               / (24.0 * 60.0 * 60.0)
-        return mdn.toordinal() + frac
+    ord = dt.toordinal()
+    mdn = dt + timedelta(days = 366)
+    frac = (dt-datetime(dt.year,dt.month,dt.day,0,0,0)).seconds / (24.0 * 60.0 * 60.0)
+    return mdn.toordinal() + frac
 
-def bin1d(x, y, step_x, min_bin=None, max_bin=None, ppb=1):
-    """ Utility function for binning data
+def bin_df(df, t_min, t_max, reso, q=0.5):
+    """ Utility function for binning timeseries data
 
     Parameters
     ----------
 
-    x : 1-d array of size n
-        1-d array along which the bins are calculated.
+    df : pandas.DataFrame
+        Aerosol number size distribution
 
-    y : 1-d array of size n or 2-d array of size (n,m)
-        2-d array with m columns, the rows correspond to values in `x`
+        `df.index` time 
+        
+        `df.columns` particle diameter (m)
 
-    step_x : float
-        resolution, or distance between bin centers.  
+        `df.values` normalized concentrations (dN/dlogDp) 
 
-    min_bin : float
-        lower edge of minimum bin
+    t_min : datetime or str (timezone aware)
+        first bin limit
 
-    max_bin : float
-        upper edge of maximum bin
+    t_max : datetime or str (timezone aware)
+        last bin limit
 
-    ppb : int
-        number of values per bin, if bin has too few values then it will
-        be `NaN`.
+    reso : int
+        desired time resolution in minutes
+
+    q : float
+        quintile of data calculated per bin
+
+        default is the median (0.5)
 
     Returns
     -------
 
-    1-d array of size k
-        bin centers
+    pandas.DataFrame
+        Binned aerosol number size distribution
 
-    1-d array of size k or 2-d array of size (k,m)
-        median values in the bins
-
-    1-d array of size k or 2-d array of size (k,m)
-        25th percentile values in the bins
-
-    1-d array of size k or 2-d array of size (k,m)
-        75th percentile values in the bins
+        All bins have constant width determined by reso and they
+        share edges. If a bin has no values it is given a value of `NaN`
 
     """
 
-    # By default use the minimum and maximum values as the limits
-    if min_bin is None:
-        min_bin=np.nanmin(x)
-    if max_bin is None:
-        max_bin=np.nanmax(x)
+    ix = pd.date_range(t_min,t_max,freq=pd.Timedelta(minutes=reso))
+    half_step = (ix[1] - ix[0])/2.    
+   
+    data = []
+    index = []
 
-    temp_x = np.arange(min_bin, max_bin+step_x, step_x)
+    for i in range(len(ix)-1):
+        df_block = df.iloc[((df.index>=ix[i]) & (df.index<ix[i+1])),:].median().values.flatten()
+        if len(df_block)==0:
+            df_block = np.nan*np.ones(len(df.columns))
+        data.append(df_block)
+        index.append(ix[i] + half_step)
 
-    data_x = (temp_x[:-1] + temp_x[1:])/2.
+    return pd.DataFrame(index = index, data = data, columns = df.columns)
 
-    if len(y.shape)==1:
-        data_25 = np.nan*np.ones(len(data_x))
-        data_50 = np.nan*np.ones(len(data_x))
-        data_75 = np.nan*np.ones(len(data_x))
-
-        for i in range(0,len(data_x)):
-    
-            y_block = y[((x>temp_x[i]) & (x<=temp_x[i+1]))]
-            y_block[np.isinf(y_block)] = np.nan
-    
-            if len(y_block)>=ppb:
-                data_25[i],data_50[i],data_75[i] = np.nanpercentile(y_block,[25,50,75],axis=0)
-            else:
-                continue
-
-    else:
-        data_25 = np.nan*np.ones((len(data_x),y.shape[1]))
-        data_50 = np.nan*np.ones((len(data_x),y.shape[1]))
-        data_75 = np.nan*np.ones((len(data_x),y.shape[1]))
-
-        for i in range(0,len(data_x)):
-    
-            y_block = y[((x>temp_x[i]) & (x<=temp_x[i+1])),:]
-            y_block[np.isinf(y_block)] = np.nan
-    
-            if len(y_block)>=ppb:
-                data_25[i,:],data_50[i,:],data_75[i,:] = np.nanpercentile(y_block,[25,50,75],axis=0)
-            else:
-                continue
-
-    return data_x, data_50, data_25, data_75
-
-def generate_log_ticks():
+def generate_log_ticks(min_exp,max_exp):
     """
     Generate ticks and ticklabels for log axis
+
+    Parameters:
+    -----------
+    
+    min_exp : int
+        The exponent in the smallest power of ten
+
+    max_exp : int
+        The exponent in the largest power of ten
+
+    Returns:
+    --------
+
+    numpy.array
+        tick values
+
+    list of str
+        tick labels for each power of ten
+
     """
     x=np.arange(1,10)
-    y=np.arange(-10,-4).astype(float)
+    y=np.arange(min_exp,max_exp).astype(float)
     log_ticks=[]
     log_tick_labels=[]
     for j in y:
@@ -176,14 +160,10 @@ def generate_log_ticks():
     return log_ticks,log_tick_labels
 
 def plot_sumfile(
-    time,
-    dp,
-    dndlogdp,
+    v,
     ax=None,
     vmin=10,
     vmax=100000,
-    cmap='turbo',
-    interp='none',
     time_reso=2,
     time_formatter="%H:%M"):    
     """ 
@@ -192,18 +172,15 @@ def plot_sumfile(
     Parameters
     ----------
 
-    time : numpy 1d array, size n
-        measurement times (MATLAB datenum)
+    v : pandas.DataFrame
+        Aerosol number size distribution
 
-    dp : numpy 1d array, size m 
-        particle diameters
-
-    dndlogdp : numpy 2d array, size (n,m)
-        number-size distribution matrix
+        time (index) should be have constant resolution, 
+        otherwise the time axis will not be correct
 
     ax : axes object
         axis on which to plot the data
-        if `None` the axis are created.
+        if `None` the axis are created
 
     vmin : float or int
         color scale lower limit
@@ -211,29 +188,23 @@ def plot_sumfile(
     vmax : float or int
         color scale upper limit
 
-    clim : iterable with two numerical elements
-        color limits
-
-    cmap : `str`
-        colormap to be used
-
-    interp : `str`
-        interpolation method passed to imshow, default `'none'`
-
     time_reso : `int`
-        Resolution on the time axis given in hours
+        Time resolution of ticks given in hours
 
     time_formatter : `str`
         Define the format of time ticklabels
-
+        
     """
 
     if ax is None:
-        fig,handle = plt.subplots()
+        fig,handle = plt.subplots(figsize=(10,4))
     else:
         handle=ax
 
-    log_ticks,log_tick_labels = generate_log_ticks()
+    dp = v.columns.values.astype(float)
+    dndlogdp = v.values.astype(float)
+
+    log_ticks,log_tick_labels = generate_log_ticks(-10,-4)
 
     norm = colors.LogNorm(vmin=vmin,vmax=vmax)
     color_ticks = LogLocator(subs=range(10))
@@ -241,17 +212,23 @@ def plot_sumfile(
     handle.set_yticks(log_ticks)
     handle.set_yticklabels(log_tick_labels)
 
-    t1=dts.date2num(datenum2datetime(time.min()))
-    t2=dts.date2num(datenum2datetime(time.max()))
+    if v.index[0].utcoffset() is None:
+        t1=dts.date2num(v.index[0])+v.index[0].second/(60.*60.*24.)
+        t2=dts.date2num(v.index[-1])+v.index[-1].second/(60.*60.*24.)
+    else:
+        t1=dts.date2num(v.index[0])+v.index[0].utcoffset().seconds/(60.*60.*24.)
+        t2=dts.date2num(v.index[-1])+v.index[-1].utcoffset().seconds/(60.*60.*24.)
+
+    dp1=np.log10(dp.min())
+    dp2=np.log10(dp.max())
 
     img = handle.imshow(
         np.flipud(dndlogdp.T),
         origin="upper",
         aspect="auto",
-        interpolation=interp,
-        cmap=cmap,
+        cmap="turbo",
         norm=norm,
-        extent=(t1,t2,np.log10(dp.min()),np.log10(dp.max()))
+        extent=(t1,t2,dp1,dp2)
     )
 
     handle.xaxis.set_major_locator(dts.HourLocator(interval=time_reso))
@@ -269,7 +246,7 @@ def plot_sumfile(
     if ax is None:
         plt.show()
 
-def dndlogdp2dn(dp,dndlogdp):
+def dndlogdp2dn(df):
     """    
     Convert from normalized number concentrations to
     unnormalized number concentrations assuming that 
@@ -278,29 +255,24 @@ def dndlogdp2dn(dp,dndlogdp):
     Parameters
     ----------
 
-    dp : numpy 1d array
-        Geometric mean diameters for the size channels
-
-    dndlogdp : numpy 2d array
-        Number size distribution with normalized concentrations
-        i.e. dN/dlogDp
+    df : pandas.DataFrame
+        Aerosol number-size distribution (dN/dlogDp)
 
     Returns
     -------
 
-    2-d array
-        The number size distribution with unnormalized concentrations 
-        i.e. dN
+    pandas.DataFrame
+        Aerosol number size distribution (dN)
 
     """
-
-    logdp_mid = np.log10(dp)
+    
+    logdp_mid = np.log10(df.columns)
     logdp = (logdp_mid[:-1]+logdp_mid[1:])/2.0
     logdp = np.append(logdp,logdp_mid.max()+(logdp_mid.max()-logdp.max()))
     logdp = np.insert(logdp,0,logdp_mid.min()-(logdp.min()-logdp_mid.min()))
     dlogdp = np.diff(logdp)
-    return dndlogdp*dlogdp
 
+    return df*dlogdp
 
 def air_viscosity(temp):
     """ 
@@ -310,13 +282,13 @@ def air_viscosity(temp):
     Parameters
     ----------
 
-    temp : float or array
+    temp : float or numpy.array
         air temperature, unit: K  
 
     Returns
     -------
 
-    float or array
+    float or numpy.array
         viscosity of air, unit: m2 s-1  
 
     """
@@ -333,16 +305,16 @@ def mean_free_path(temp,pres):
     Parameters
     ----------
 
-    temp : float
+    temp : float or numpy.array
         air temperature, unit: K  
 
-    pres : float
+    pres : float or numpy.array
         air pressure, unit: Pa
 
     Returns
     -------
 
-    float
+    float or numpy.array
         mean free path in air, unit: m  
 
     """
@@ -350,7 +322,7 @@ def mean_free_path(temp,pres):
     R=8.3143
     Mair=0.02897
     mu=air_viscosity(temp)
-    return (2.*mu)/(pres*(8.*Mair/(np.pi*R*temp))**(1./2.))
+    return (mu/pres)*((np.pi*R*temp)/(2.*Mair))**0.5
 
 def slipcorr(dp,temp,pres):
     """
@@ -359,21 +331,23 @@ def slipcorr(dp,temp,pres):
     Parameters
     ----------
 
-    dp : float or numpy array
-        particle diameter, unit: m 
+    dp : float or numpy array (m,)
+        particle diameter, unit m 
 
-    temp : float
-        air temperature, unit: K 
+    temp : float or numpy.array (n,1)
+        air temperature, unit K 
 
-    pres : float
-        air pressure, unit: Pa
+    pres : float or numpy.array (n,1)
+        air pressure, unit Pa
 
     Returns
     -------
 
-    float or numpy array
-        Cunningham slip correction factor for each particle diameter, 
-        unit: dimensionless        
+    float or numpy.array (m,) or (n,m)
+        Cunningham slip correction factor for each particle diameter,
+        if temperature and pressure and arrays then for each particle 
+        diameter at different pressure/temperature values.
+        unit dimensionless        
 
     """
    
@@ -387,21 +361,22 @@ def particle_diffusivity(dp,temp,pres):
     Parameters
     ----------
 
-    dp : float or array
+    dp : float or numpy.array (m,) 
         particle diameter, unit: m 
 
-    temp : float
+    temp : float or numpy.array (n,1)
         air temperature, unit: K 
 
-    pres : float
+    pres : float or numpy.array (n,1)
         air pressure, unit: Pa
 
     Returns
     -------
 
-    float or array
+    float or numpy.array (m,) or (n,m)
         Brownian diffusivity in air for particles of size dp,
-        unit: m2 s-1
+        and at each temperature/pressure value
+        unit m2 s-1
 
     """
 
@@ -418,17 +393,18 @@ def particle_thermal_speed(dp,temp):
     Parameters
     ----------
 
-    dp : float or array
+    dp : float or numpy.array (m,)
         particle diameter, unit: m 
 
-    temp : float
+    temp : float or numpy.array (n,1)
         air temperature, unit: K 
 
     Returns
     -------
 
-    float or array
-        Particle thermal speed for each dp, unit: m s-1
+    float or numpy.array (m,) or (n,m)
+        Particle thermal speed for each dp at each temperature 
+        point, unit: m s-1
 
     """
 
@@ -445,19 +421,19 @@ def particle_mean_free_path(dp,temp,pres):
     Parameters
     ----------
 
-    dp : float or array
+    dp : float or numpy.array (m,)
         particle diameter, unit: m 
 
-    temp : float
+    temp : float or numpy.array (n,1)
         air temperature, unit: K 
 
-    pres : float
+    pres : float or numpy.array (n,1)
         air pressure, unit: Pa
 
     Returns
     -------
 
-    float or array
+    float or numpy.array (m,) or (n,m)
         Particle mean free path for each dp, unit: m
 
     """
@@ -474,23 +450,31 @@ def coagulation_coef(dp1,dp2,temp,pres):
     Parameters
     ----------
 
-    dp1 : float
+    dp1 : float or numpy.array (m,)
         first particle diameter, unit: m 
 
-    dp2 : float
+    dp2 : float or numpy.array (m,)
         second particle diameter, unit: m 
 
-    temp : float
+    temp : float or numpy.array (n,1)
         air temperature, unit: K 
 
-    pres : float
+    pres : float or numpy.array (n,1)
         air pressure, unit: Pa
 
     Returns
     -------
 
-    float or array
-        Brownian coagulation coefficient (Fuchs), unit: m3 s-1
+    float or numpy.array
+        Brownian coagulation coefficient (Fuchs), 
+        
+        for example if all parameters are arrays
+        the function returns a 2d array where 
+        the entry at i,j correspoinds to the 
+        coagulation coefficient for particle sizes
+        dp1[i] and dp2[i] at temp[j] and pres[j].
+
+        unit m3 s-1
 
     """
 
@@ -509,7 +493,7 @@ def coagulation_coef(dp1,dp2,temp,pres):
            * ( (dp1+dp2)/(dp1+dp2+2.*(g1**2.+g2**2.)**0.5) + \
            +   (8.*(D1+D2))/((c1**2.+c2**2.)**0.5*(dp1+dp2)) )
 
-def calc_coags(Dp,dp,dndlogdp,temp,pres):
+def calc_coags(df,Dp,dp,temp,pres):
     """ 
     Calculate coagulation sink
 
@@ -518,55 +502,39 @@ def calc_coags(Dp,dp,dndlogdp,temp,pres):
     Parameters
     ----------
 
+    df : pandas.DataFrame
+        Aerosol number size distribution
+
     Dp : float
         Particle diameter for which you want to calculate the CoagS, 
         unit: m
 
-    dp : numpy 1d array, size m
-        diameter in the data, unit: meters,
-        unit: m
-
-    dndlogdp : numpy 2d array, size (n,m)
-        dN/dlogDp matrix,
-        unit: cm-3
-
-    temp : float or numpy 1d array of size n
-        Ambient temperature corresponding to the data,
+    temp : pandas.DataFrame
+        Ambient temperature timeseries
         unit: K
 
-    pres : float or numpy 1d array of size n
-        Ambient pressure corresponding to the data,
+    pres : pandas.DataFrame
+        Ambient pressure timeseries
         unit: Pa
 
     Returns
     -------
     
-    numpy 1d array, size n
+    pandas.DataFrame
         Coagulation sink time series,
         unit: s-1
 
     """
 
-    n = dndlogdp.shape[0]
-
-    if not isinstance(temp,Iterable):
-        temp = temp*np.ones(n)
-
-    if not isinstance(pres,Iterable):
-        pres = pres*np.ones(n)
-
-    dn = dndlogdp2dn(dp,dndlogdp)
-    dp = dp[dp>=Dp]
-    dn = dn[:,dp>=Dp]
-
-    coags = np.nan*np.ones(n)
-
-    for i in range(n):
-        # multiply by 1e6 to make [K] = cm3 s-1
-        coags[i] = np.nansum(1e6*coagulation_coef(Dp,dp,temp[i],pres[i])*dn[i,:])
-                
-    return coags
+    df = df.loc[:,df.columns>=Dp]
+    temp = temp.reindex(df.index, method="nearest")
+    pres = pres.reindex(df.index, method="nearest")
     
+    a = dndlogdp2dn(df)
+    b = 1e6*coagulation_coef(Dp,df.columns.values,temp.values,pres.values)
+ 
+    return (a*b).sum(axis=1,min_count=1)
+   
 def diam2mob(dp,temp,pres,ne):
     """ 
     Convert electrical mobility diameter to electrical mobility in air
@@ -574,15 +542,15 @@ def diam2mob(dp,temp,pres,ne):
     Parameters
     ----------
 
-    dp : float or numpy 1d array
+    dp : float or numpy.array (m,)
         particle diameter(s),
         unit : m
 
-    temp : float
+    temp : float or numpy.array (n,1)
         ambient temperature, 
         unit: K
 
-    pres : float
+    pres : float or numpy.array (n,1)
         ambient pressure, 
         unit: Pa
 
@@ -592,7 +560,7 @@ def diam2mob(dp,temp,pres,ne):
     Returns
     -------
 
-    float or numpy 1d array
+    float or numpy.array
         particle electrical mobility or mobilities, 
         unit: m2 s-1 V-1
 
@@ -613,7 +581,7 @@ def mob2diam(Zp,temp,pres,ne):
     Parameters
     ----------
 
-    Zp : float or numpy 1d array
+    Zp : float
         particle electrical mobility or mobilities, 
         unit: m2 s-1 V-1
 
@@ -631,8 +599,8 @@ def mob2diam(Zp,temp,pres,ne):
     Returns
     -------
 
-    float or numpy 1d array
-        particle diameter(s), unit: m
+    float
+        particle diameter, unit: m
     
     """
 
@@ -654,11 +622,11 @@ def binary_diffusivity(temp,pres,Ma,Mb,Va,Vb):
     Parameters
     ----------
 
-    temp : float
+    temp : float or numpy.array
         temperature, 
         unit: K
 
-    pres : float
+    pres : float or numpy.array
         pressure, 
         unit: Pa
 
@@ -681,7 +649,7 @@ def binary_diffusivity(temp,pres,Ma,Mb,Va,Vb):
     Returns
     -------
 
-    float
+    float or numpy.array
         binary diffusivity, 
         unit: m2 s-1
 
@@ -700,19 +668,19 @@ def beta(dp,temp,pres,diffusivity,molar_mass):
     Parameters
     ----------
 
-    dp : float or numpy 1d array
+    dp : float or numpy.array (m,)
         aerosol particle diameter(s), 
         unit: m
 
-    temp : float
+    temp : float or numpy.array (n,1)
         temperature, 
         unit: K
 
-    pres : float
+    pres : float or numpy.array (n,1)
         pressure,
         unit: Pa
 
-    diffusivity : float
+    diffusivity : float or numpy.array (n,1)
         diffusivity of the gas that is condensing, 
         unit: m2/s
 
@@ -723,8 +691,9 @@ def beta(dp,temp,pres,diffusivity,molar_mass):
     Returns
     -------
 
-    float or 1-d numpy array
-        Fuchs Sutugin correction factor for each particle diameter, 
+    float or numpy.array
+        Fuchs Sutugin correction factor for each particle diameter and 
+        temperature/pressure 
         unit: m2/s
 
     """
@@ -735,7 +704,7 @@ def beta(dp,temp,pres,diffusivity,molar_mass):
     
     return (1. + knud)/(1. + 1.677*knud + 1.333*knud**2)
 
-def calc_cs(dp,dndlogdp,temp,pres):
+def calc_cs(df,temp,pres):
     """
     Calculate condensation sink, assuming that the condensing gas is sulfuric acid in air
     with aerosol particles.
@@ -745,16 +714,13 @@ def calc_cs(dp,dndlogdp,temp,pres):
     Parameters
     ----------
 
-    dp : numpy 1d array, size m
-        diameter in the data, unit: m
+    df : pandas.DataFrame
+        aerosol number size distribution (dN/dlogDp)
 
-    dndlogdp : numpy 2d array, size (n,m)
-        dN/dlogDp matrix, unit: cm-3
-
-    temp : numpy 1d array, size n
+    temp : pandas.DataFrame
         Ambient temperature corresponding to the data, unit: K
 
-    pres : numpy 1d array, size n
+    pres : pandas.DataFrame
         Ambient pressure corresponding to the data, unit: Pa
 
     Returns
@@ -765,31 +731,24 @@ def calc_cs(dp,dndlogdp,temp,pres):
 
     """
 
-    n = dndlogdp.shape[0]
-
-    if not isinstance(temp,Iterable):
-        temp=temp*np.ones(n)
-
-    if not isinstance(pres,Iterable):
-        pres=pres*np.ones(n)
-
+    temp = temp.reindex(df.index, method="nearest")
+    pres = pres.reindex(df.index, method="nearest")
+ 
     M_h2so4 = 98.08   
     M_air = 28.965    
     V_air = 19.7      
     V_h2so4 = 51.96  
 
-    dn = dndlogdp2dn(dp,dndlogdp)
-    cs = np.nan*np.ones(n)
+    dn = dndlogdp2dn(df)
+    dp = df.columns.values.astype(float)
 
-    for i in range(n):
-        diffusivity = binary_diffusivity(temp[i],pres[i],M_h2so4,M_air,V_h2so4,V_air)
-        b = beta(dp,temp[i],pres[i],diffusivity,M_h2so4)
-
-        cs[i] = (4.*np.pi*diffusivity)*np.nansum(1e6*dn[i,:]*b*dp)
-
+    diffu = binary_diffusivity(temp.values,pres.values,M_h2so4,M_air,V_h2so4,V_air)
+    beta = beta(dp,temp.values,pres.values,diffu,M_h2so4)
+    df2 = (1e6*dn*(beta*dp)).sum(axis=1,min_count=1)
+    cs = (4.*np.pi*diffu)*df2
     return cs
 
-def calc_conc(dp,dndlogdp,dmin,dmax):
+def calc_conc(df,dmin,dmax):
     """
     Calculate particle number concentration from aerosol 
     number-size distribution
@@ -797,11 +756,8 @@ def calc_conc(dp,dndlogdp,dmin,dmax):
     Parameters
     ----------
 
-    dp : numpy 1d array, size m
-        diameter in the data, unit: m
-
-    dndlogdp : numpy 2d array, size (n,m)
-        dN/dlogDp matrix, unit: cm-3
+    df : pandas.DataFrame
+        Aerosol number-size distribution
 
     dmin : float
         Size range lower diameter, unit: m
@@ -812,22 +768,23 @@ def calc_conc(dp,dndlogdp,dmin,dmax):
     Returns
     -------
     
-    numpy 1d array, size n
+    pandas.DataFrame
         Number concentration in the given size range, unit: cm-3
 
     """
-    
-    findex = np.argwhere((dp<=dmax)&(dp>=dmin)).flatten()
-    dp = dp[findex]
-    dndlogdp = dndlogdp[:,findex]
-    logdp_mid = np.log10(dp)
-    logdp = (logdp_mid[:-1]+logdp_mid[1:])/2.0
-    logdp = np.append(logdp,logdp_mid.max()+(logdp_mid.max()-logdp.max()))
-    logdp = np.insert(logdp,0,logdp_mid.min()-(logdp.min()-logdp_mid.min()))
-    dlogdp = np.diff(logdp)
-    return np.nansum(dndlogdp*dlogdp,axis=1)
+    dp = df.columns.values.astype(float)
+    df2 = df.loc[:,((dp>=dmin) & (dp<=dmax))]
+    dp2 = df2.columns.values.astype(float)
+    df2.columns = np.log10(dp2)
+    dense_dp = np.full(len(df2.columns)*10,np.nan)[:-9]
+    dense_dp[::10] = df2.columns.values
+    dense_dp = pd.DataFrame(dense_dp).interpolate().values.flatten()
+    df3 = df2.reindex(dense_dp,axis=1)
+    df4 = df3.interpolate(axis=1)
+    conc = df4.apply(trapezoid,args=(df4.columns,),axis=1) 
+    return pd.DataFrame(index = df.index, data = conc)
 
-def calc_formation_rate(time,dp1,dp2,conc,coags,gr):
+def calc_formation_rate(dp1,dp2,conc,coags,gr):
     """
     Calculate particle formation rate
 
@@ -835,39 +792,45 @@ def calc_formation_rate(time,dp1,dp2,conc,coags,gr):
 
     Parameters
     ----------
-
-    time : numpy 1d array
-        time associated with the measurements
-
+    
     dp1 : float
         Lower diameter of the size range, unit: m
 
     dp2 : float
-        Upper diameter of the size range, unit: m
+        Upper diameter of the size range, unit m
 
-    conc : numpy 1d array
-        Particle number concentration in the size range dp1...dp2, unit: cm-3
+    conc : pandas.DataFrame
+        particle number concentration timeseries
+        in the size range dp1...dp2, unit cm-3
 
-    coags : numpy 1d array
-        Coagulation sink for particles in the size range dp1...dp2. Usually approximated as coagulation sink for particle size dp1, unit: s-1
+    coags : pandas.DataFrame
+        Coagulation sink timeseries for particles 
+        in the size range dp1...dp2. unit s-1 
+
+        Usually approximated as coagulation sink for particle size dp1, 
+        unit s-1
 
     gr : float
-        Growth rate for particles out of the size range dp1...dp2, unit: nm h-1
+        Growth rate for particles out of the size range dp1...dp2, 
+        unit nm h-1
 
     Returns
     -------
 
-    numpy 1d array
+    pandas.DataFrame
         particle formation rate for diameter dp1, unit: cm3 s-1
 
     """
-
-    conc_term = np.diff(conc)/np.diff(time*1.157e5)
-    sink_term = (coags[1:] + coags[:-1])/2. * (conc[1:] + conc[:-1])/2.
-    gr_term = (2.778e-13*gr)/(dp2-dp1) * (conc[1:] + conc[:-1])/2.
+   
+    # Fit the coags to the conc index
+    coags = coags.reindex(conc.index,method="nearest")
+    time_diff = pd.DataFrame(conc.index).diff().astype('datetime64[s]').values
+    conc_term = np.diff(conc.values)/time_diff
+    sink_term = (coags.values[1:] + coags.values[:-1])/2. * (conc.values[1:] + conc.values[:-1])/2.
+    gr_term = (2.778e-13*gr)/(dp2-dp1) * (conc.values[1:] + conc.values[:-1])/2.
     formation_rate = conc_term + sink_term + gr_term
 
-    return formation_rate
+    return pd.DataFrame(index = conc.index, data = formation_rate)
 
 def calc_ion_formation_rate(
     time,
@@ -888,8 +851,8 @@ def calc_ion_formation_rate(
     Parameters
     ----------
 
-    time : numpy 1d array
-        Time associated with the measurements, unit: days  
+    time : numpy.array of datetime objects
+        Time associated with the measurements 
 
     dp1 : float
         Lower diameter of the size range, unit: m
@@ -897,22 +860,22 @@ def calc_ion_formation_rate(
     dp2 : float
         Upper diameter of the size range, unit: m
 
-    conc_pos : numpy 1d array
+    conc_pos : numpy.array
         Positive ion number concentration in the size range dp1...dp2, unit: cm-3
 
-    conc_neg : numpy 1d array
+    conc_neg : numpy.array
         Negative ion number concentration in the size range dp1...dp2, unit: cm-3
 
-    conc_pos_small : numpy 1d array
+    conc_pos_small : numpy.array
         Positive ion number concentration for ions smaller than dp1, unit: cm-3
 
-    conc_neg_small : numpy 1d array
+    conc_neg_small : numpy.array
         Negative ion number concentration for ions smaller than dp1, unit: cm-3
 
-    conc : numpy 1d array
+    conc : numpy.array
         Particle number concentration in the size range dp1...dp2, unit: cm-3
 
-    coags : numpy 1d array
+    coags : numpy.array
         Coagulation sink for particles in the size range dp1...dp2.
         Usually approximated as coagulation sink for particle size dp1, 
         unit: s-1
@@ -923,13 +886,24 @@ def calc_ion_formation_rate(
     Returns
     -------
 
-    numpy 1d array
-        Positive ion formation rate for diameter dp1, unit : cm3 s-1
+    pandas.DataFrame
+        Time as index
+        Negative ion formation rate for diameter dp1, unit : cm3 s-1
 
-    numpy 1d array
-        Negative ion formation rate for diameter dp1, unit: cm3 s-1
+    pandas.DataFrame
+        Time as index
+        Positive ion formation rate for diameter dp1, unit: cm3 s-1
 
     """
+
+    # Reindex everything to conc_neg
+    coags = coags.reindex(conc_neg.index,method="nearest")
+    conc_pos = conc_pos.reindex(conc_neg.index,method="nearest")
+    conc = conc.reindex(conc_neg.index,method="nearest")
+    conc_neg_small = conc_neg_small.reindex(conc_neg.index,method="nearest")
+    conc_pos_small = conc_pos_small.reindex(conc_neg.index,method="nearest")
+
+    time_diff=pd.DataFrame(conc_neg.index).diff().astype('datetime64[s]').values
 
     alpha = 1.6e-6 # cm3 s-1
     Xi = 0.01e-6 # cm3 s-1
@@ -941,18 +915,65 @@ def calc_ion_formation_rate(
     conc_neg_small = (conc_neg_small[1:] + conc_neg_small[:-1])/2.
     conc = (conc[1:] + conc[:-1])/2.
 
-    pos_conc_term = np.diff(conc_pos)/np.diff(time*1.157e5)
+    pos_conc_term = np.diff(conc_pos)/time_diff
     pos_sink_term = coags * conc_pos
     pos_gr_term = (2.778e-13*gr)/(dp2-dp1) * conc_pos
     pos_recombination_term = alpha * conc_pos * conc_neg_small
     pos_charging_term = Xi * conc * conc_pos_small
     pos_formation_rate = pos_conc_term + pos_sink_term + pos_gr_term + pos_recombination_term - pos_charging_term
 
-    neg_conc_term = np.diff(conc_neg)/np.diff(time*1.157e5)
+    neg_conc_term = np.diff(conc_neg)/time_diff
     neg_sink_term = coags * conc_neg
     neg_gr_term = (2.778e-13*gr)/(dp2-dp1) * conc_neg
     neg_recombination_term = alpha * conc_neg * conc_pos_small
     neg_charging_term = Xi * conc * conc_neg_small
     neg_formation_rate = neg_conc_term + neg_sink_term + neg_gr_term + neg_recombination_term - neg_charging_term
 
-    return pos_formation_rate, neg_formation_rate
+    neg_J = pd.DataFrame(index = time, data = neg_formation_rate)
+    pos_J = pd.DataFrame(index = time, data = pos_formation_rate)
+ 
+    return neg_J, pos_J
+
+def stack_data(filenames,t_min,t_max,reso):
+    """
+    Concatenate data
+
+    If multiple data tables share the same header
+    and have time as index then this function can be
+    used to concatenate the data into a single large 
+    data frame.
+    
+    Parameters
+    ----------
+    
+    filenames : list of strings
+        filenames of the data to be combined
+
+    t_min : datetime or str (timezone aware)
+
+    t_max : datetime or str (timezone aware)
+
+    reso : int
+        desired time resolution of the output in minutes
+        
+    Returns
+    -------
+
+    pandas.DataFrame
+        stacked data
+
+    """
+    df_combined = pd.DataFrame([])
+    for f in filenames:
+        df = pd.read_csv(f,index_col=0,parse_dates=True)
+        df_tmin = df.index[0]
+        df_tmax = df.index[-1]+pd.Timedelta(minutes=reso)
+        df_combined = pd.concat((df_combined,bin_df(df,df_tmin,df_tmax,reso)),axis=0)
+
+    if len(df_combined)==0:
+        return df_combined
+    else:
+        df_combined = df_combined.sort_index()
+        df_combined = bin_df(df_combined,t_min,t_max,reso)
+
+        return df_combined

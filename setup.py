@@ -5,7 +5,7 @@ with open("README.md","r") as fh:
 
 setup(
     name="aerosol-functions",
-    version="0.0.2",
+    version="0.0.3",
     description='Functions to analyze atmospheric aerosol data',
     py_modules=["aerosol_functions"],
     package_dir={'':'src'},
