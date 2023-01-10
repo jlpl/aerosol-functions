@@ -1,6 +1,5 @@
 """
-Collection of functions to analyze atmospheric 
-aerosol data.
+Collection of functions to analyze atmospheric aerosol data
 """
 
 import numpy as np
@@ -75,20 +74,19 @@ def bin_df(df, t_min, t_max, reso, q=0.5):
     df : pandas.DataFrame
         Aerosol number size distribution
 
-        `df.index` time 
-        
+        `df.index` time  
         `df.columns` particle diameter (m)
-
         `df.values` normalized concentrations (dN/dlogDp) 
 
-    t_min : datetime or str (timezone aware)
-        first bin limit
+    t_min : datetime or str
+        first bin lower limit
 
-    t_max : datetime or str (timezone aware)
-        last bin limit
+    t_max : datetime or str
+        last bin upper limit
 
-    reso : int
+    reso : int or str
         desired time resolution in minutes
+        or pandas time offset alias 
 
     q : float
         quintile of data calculated per bin
@@ -105,9 +103,13 @@ def bin_df(df, t_min, t_max, reso, q=0.5):
         share edges. If a bin has no values it is given a value of `NaN`
 
     """
+    if isinstance(reso,int):
+        reso = pd.Timedelta(minutes=reso)
+    if isinstance(reso,str):
+        pass
 
-    ix = pd.date_range(t_min,t_max,freq=pd.Timedelta(minutes=reso))
-    half_step = (ix[1] - ix[0])/2.    
+    ix = pd.date_range(t_min,t_max,freq=reso)
+    half_step = (ix[1] - ix[0])/2.
    
     data = []
     index = []
@@ -266,7 +268,7 @@ def dndlogdp2dn(df):
 
     """
     
-    logdp_mid = np.log10(df.columns)
+    logdp_mid = np.log10(df.columns.values.astype(float))
     logdp = (logdp_mid[:-1]+logdp_mid[1:])/2.0
     logdp = np.append(logdp,logdp_mid.max()+(logdp_mid.max()-logdp.max()))
     logdp = np.insert(logdp,0,logdp_mid.min()-(logdp.min()-logdp_mid.min()))
@@ -717,36 +719,50 @@ def calc_cs(df,temp,pres):
     df : pandas.DataFrame
         aerosol number size distribution (dN/dlogDp)
 
-    temp : pandas.DataFrame
+    temp : pandas.DataFrame or float
         Ambient temperature corresponding to the data, unit: K
+        If single value given it is used for all data
 
-    pres : pandas.DataFrame
+    pres : pandas.DataFrame or float
         Ambient pressure corresponding to the data, unit: Pa
+        If single value given it is used for all data
 
     Returns
     -------
     
-    numpy 1d array, size n
+    pandas.DataFrame
         condensation sink time series, unit: s-1
 
     """
+    
+    if isinstance(temp,float):
+        temp = pd.DataFrame(index = df.index, columns=["Temperature"], data=temp)
+    else:
+        temp = temp.reindex(df.index, method="nearest")
 
-    temp = temp.reindex(df.index, method="nearest")
-    pres = pres.reindex(df.index, method="nearest")
- 
+    if isinstance(pres,float):
+        pres = pd.DataFrame(index = df.index, columns=["Pressure"], data=pres)
+    else:
+        pres = pres.reindex(df.index, method="nearest")
+
     M_h2so4 = 98.08   
     M_air = 28.965    
     V_air = 19.7      
     V_h2so4 = 51.96  
 
     dn = dndlogdp2dn(df)
+
     dp = df.columns.values.astype(float)
 
     diffu = binary_diffusivity(temp.values,pres.values,M_h2so4,M_air,V_h2so4,V_air)
-    beta = beta(dp,temp.values,pres.values,diffu,M_h2so4)
-    df2 = (1e6*dn*(beta*dp)).sum(axis=1,min_count=1)
-    cs = (4.*np.pi*diffu)*df2
-    return cs
+
+    b = beta(dp,temp.values,pres.values,diffu,M_h2so4)
+
+    df2 = (1e6*dn*(b*dp)).sum(axis=1,min_count=1)
+
+    cs = (4.*np.pi*diffu.flatten())*df2.values
+
+    return pd.DataFrame(index=df.index,columns=["CS"],data=cs)
 
 def calc_conc(df,dmin,dmax):
     """
@@ -772,17 +788,32 @@ def calc_conc(df,dmin,dmax):
         Number concentration in the given size range, unit: cm-3
 
     """
+
     dp = df.columns.values.astype(float)
-    df2 = df.loc[:,((dp>=dmin) & (dp<=dmax))]
-    dp2 = df2.columns.values.astype(float)
-    df2.columns = np.log10(dp2)
-    dense_dp = np.full(len(df2.columns)*10,np.nan)[:-9]
-    dense_dp[::10] = df2.columns.values
-    dense_dp = pd.DataFrame(dense_dp).interpolate().values.flatten()
-    df3 = df2.reindex(dense_dp,axis=1)
-    df4 = df3.interpolate(axis=1)
-    conc = df4.apply(trapezoid,args=(df4.columns,),axis=1) 
-    return pd.DataFrame(index = df.index, data = conc)
+    findex=np.argwhere((dp<=dmax)&(dp>=dmin)).flatten()
+    if len(findex)==0:
+        return np.nan*np.ones(df.shape[0])
+    dp=dp[findex]
+    conc=df.iloc[:,findex]
+    logdp_mid=np.log10(dp)
+    logdp=(logdp_mid[:-1]+logdp_mid[1:])/2.0
+    logdp=np.append(logdp,logdp_mid.max()+(logdp_mid.max()-logdp.max()))
+    logdp=np.insert(logdp,0,logdp_mid.min()-(logdp.min()-logdp_mid.min()))
+    dlogdp=np.diff(logdp)
+    conc = np.nansum(conc*dlogdp,axis=1)
+    return pd.DataFrame(index=df.index,data=conc,columns=["conc"])
+
+#    dp = df.columns.values.astype(float)
+#    df2 = df.loc[:,((dp>=dmin) & (dp<=dmax))]
+#    dp2 = df2.columns.values.astype(float)
+#    df2.columns = np.log10(dp2)
+#    dense_dp = np.full(len(df2.columns)*10,np.nan)[:-9]
+#    dense_dp[::10] = df2.columns.values
+#    dense_dp = pd.DataFrame(dense_dp).interpolate().values.flatten()
+#    df3 = df2.reindex(dense_dp,axis=1)
+#    df4 = df3.interpolate(axis=1)
+#    conc = df4.apply(trapezoid,args=(df4.columns,),axis=1) 
+#    return pd.DataFrame(index = df.index, data = conc)
 
 def calc_formation_rate(dp1,dp2,conc,coags,gr):
     """
@@ -949,13 +980,14 @@ def stack_data(filenames,t_min,t_max,reso):
     filenames : list of strings
         filenames of the data to be combined
 
-    t_min : datetime or str (timezone aware)
+    t_min : datetime or str
 
-    t_max : datetime or str (timezone aware)
+    t_max : datetime or str
 
-    reso : int
+    reso : int or str
         desired time resolution of the output in minutes
-        
+        or pandas time offset alias
+    
     Returns
     -------
 
@@ -963,12 +995,12 @@ def stack_data(filenames,t_min,t_max,reso):
         stacked data
 
     """
+
     df_combined = pd.DataFrame([])
     for f in filenames:
+        print(f)
         df = pd.read_csv(f,index_col=0,parse_dates=True)
-        df_tmin = df.index[0]
-        df_tmax = df.index[-1]+pd.Timedelta(minutes=reso)
-        df_combined = pd.concat((df_combined,bin_df(df,df_tmin,df_tmax,reso)),axis=0)
+        df_combined = pd.concat((df_combined,df),axis=0)
 
     if len(df_combined)==0:
         return df_combined
