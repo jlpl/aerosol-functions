@@ -1,3 +1,2 @@
 include *.in
 recursive-include docs *.html
-recursive-include src *.swp
