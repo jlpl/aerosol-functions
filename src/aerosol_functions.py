@@ -1,33 +1,27 @@
 """
-Collection of functions to analyze atmospheric aerosol data
-
+v. 0.0.6
 """
 
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import matplotlib.dates as dts
-from matplotlib.ticker import LogLocator
 from matplotlib import colors
-from datetime import datetime, timedelta, timezone
+from matplotlib.pyplot import cm
+from datetime import datetime, timedelta
 from scipy.optimize import minimize
-from scipy.integrate import trapezoid
 
-def datenum2datetime(datenum,tz=None):
+def datenum2datetime(datenum):
     """
     Convert from matlab datenum to python datetime 
 
     Parameters
     ----------
 
-    datenum : float
+    datenum : float or int
         A serial date number representing the whole and 
         fractional number of days from 1-Jan-0000 to a 
         specific date (MATLAB datenum)
-  
-    tz : int or `None`
-        Timezone offset in minutes from UTC
-        `None` implies timezone unaware
 
     Returns
     -------
@@ -35,12 +29,9 @@ def datenum2datetime(datenum,tz=None):
     pandas.Timestamp
 
     """
-    dt = (datetime.fromordinal(int(datenum)) + timedelta(days=datenum%1) - timedelta(days = 366))
-    if tz is not None:
-        tz_offset = timezone(timedelta(minutes=tz))
-        dt = dt.replace(tzinfo=tz_offset)
 
-    return pd.to_datetime(dt.isoformat())
+    return (datetime.fromordinal(int(datenum)) + 
+        timedelta(days=datenum%1) - timedelta(days = 366))
 
 def datetime2datenum(dt):
     """ 
@@ -66,162 +57,257 @@ def datetime2datenum(dt):
     frac = (dt-datetime(dt.year,dt.month,dt.day,0,0,0)).seconds / (24.0 * 60.0 * 60.0)
     return mdn.toordinal() + frac
 
-def bin_df(df, t_min, t_max, reso, q=0.5):
-    """ Utility function for binning timeseries data
-
-    Parameters
-    ----------
-
-    df : pandas.DataFrame
-        Aerosol number size distribution
-
-        `df.index` time  
-        `df.columns` particle diameter (m)
-        `df.values` normalized concentrations (dN/dlogDp) 
-
-    t_min : datetime or str
-        first bin lower limit
-
-    t_max : datetime or str
-        last bin upper limit
-
-    reso : int or str
-        desired time resolution in minutes
-        or pandas time offset alias 
-
-    q : float
-        quintile of data calculated per bin
-
-        default is the median (0.5)
-
-    Returns
-    -------
-
-    pandas.DataFrame
-        Binned aerosol number size distribution
-
-        All bins have constant width determined by reso and they
-        share edges. If a bin has no values it is given a value of `NaN`
-
-    """
-    if isinstance(reso,int):
-        reso = pd.Timedelta(minutes=reso)
-    if isinstance(reso,str):
-        pass
-
-    ix = pd.date_range(t_min,t_max,freq=reso)
-    half_step = (ix[1] - ix[0])/2.
-   
-    data = []
-    index = []
-
-    for i in range(len(ix)-1):
-        df_block = df.iloc[((df.index>=ix[i]) & (df.index<ix[i+1])),:].median().values.flatten()
-        if len(df_block)==0:
-            df_block = np.nan*np.ones(len(df.columns))
-        data.append(df_block)
-        index.append(ix[i] + half_step)
-
-    return pd.DataFrame(index = index, data = data, columns = df.columns)
-
 def generate_log_ticks(min_exp,max_exp):
     """
     Generate ticks and ticklabels for log axis
 
-    Parameters:
-    -----------
+    Parameters
+    ----------
     
     min_exp : int
         The exponent in the smallest power of ten
-
     max_exp : int
         The exponent in the largest power of ten
 
-    Returns:
-    --------
+    Returns
+    -------
 
     numpy.array
         tick values
-
     list of str
         tick labels for each power of ten
 
     """
+
     x=np.arange(1,10)
     y=np.arange(min_exp,max_exp).astype(float)
-    log_ticks=[]
-    log_tick_labels=[]
+    log_minorticks=[]
+    log_majorticks=[]
+    log_majorticklabels=[]
     for j in y:
         for i in x:
-            log_ticks.append(np.log10(np.round(i*10**j,int(np.abs(j)))))
+            log_minorticks.append(np.log10(np.round(i*10**j,int(np.abs(j)))))
             if i==1:
-                log_tick_labels.append("10$^{%d}$"%j)
+                log_majorticklabels.append("10$^{%d}$"%j)
+                log_majorticks.append(np.log10(np.round(i*10**j,int(np.abs(j)))))
+
+    log_minorticks=np.array(log_minorticks)
+    log_majorticks=np.array(log_majorticks)
+    return log_minorticks,log_majorticks,log_majorticklabels
+
+def subplot_aerosol_dist(
+    vlist,
+    grid,
+    cmap=cm.rainbow,
+    norm=colors.Normalize(10,10000),
+    xminortick_interval="1H",
+    xmajortick_interval="2H",
+    xticklabel_format="%H:%M",
+    keep_inner_ticklabels=False,
+    subplot_padding=None,
+    label_subplots=False,
+    label_color="white",
+    column_titles=None,
+    font_size=12):
+    """ 
+    Plot aerosol size distributions (subplots)
+
+    Parameters
+    ----------
+
+    vlist : list of pandas.DataFrames
+        Aerosol size distributions (continuous index)    
+    grid : tuple (rows,columns)
+        define number of rows and columns
+    cmap :  matplotlib colormap
+        Colormap to use, default is rainbow    
+    norm : matplotlib.colors norm
+        Define how to normalize the colors.
+        Default is linear normalization
+    xminortick_interval : str
+        A pandas date frequency string 
+        
+        See for all options here: 
+        https://pandas.pydata.org/pandas-docs/stable/user_guide/timeseries.html#offset-aliases
+    xmajortick_interval : str
+        A pandas date frequency string
+    xticklabel_format : str
+        Date format string
+        
+        See for all options here: 
+        https://docs.python.org/3/library/datetime.html#strftime-and-strptime-format-code
+    keep_inner_ticklabels : bool
+        If True, use ticklabels in all subplots.
+        If False, use ticklabels only on outer subplots.
+    subplot_padding : number or None
+        Adjust space between subplots
+    label_subplots : bool
+        Put labels on subplots
+    label_color : str
+    column_titles : list of strings or None
+    font_size : int
+    
+    Returns
+    -------
+    
+    figure object
+    array of axes objects
+     
+    """
+    
+    labels = "abcdefghijklmnopqrstuvwxyzo"
+    
+    assert isinstance(vlist,list)
+    
+    rows = grid[0]
+    columns = grid[1]
+    fig,ax = plt.subplots(rows,columns)
+    
+    if subplot_padding is not None:
+        fig.tight_layout(pad=subplot_padding)
+    
+    ax = ax.flatten()
+    
+    assert len(vlist)==len(ax)
+    
+    ax_last = ax[-1].get_position()
+    ax_first = ax[0].get_position()       
+    origin = (ax_first.x0,ax_last.y0)
+    size = (ax_last.x1-ax_first.x0,ax_first.y1-ax_last.y0)
+    ax_width = ax_first.x1-ax_first.x0
+    ax_height = ax_first.y1-ax_first.y0    
+    last_row_ax = ax[-1*columns:]
+    first_col_ax = ax[::columns]
+    first_row_ax = ax[:columns]
+    
+    log_minorticks,log_majorticks,log_majorticklabels = generate_log_ticks(-10,-4)
+    
+    for i,vi,axi in zip(np.arange(len(ax)),vlist,ax):
+        dndlogdp = vi.values.astype(float)
+        tim=vi.index
+        dp=vi.columns.values.astype(float)
+        t1=dts.date2num(tim[0])
+        t2=dts.date2num(tim[-1])
+        dp1=np.log10(dp.min())
+        dp2=np.log10(dp.max())
+        img = axi.imshow(
+            np.flipud(dndlogdp.T),
+            origin="upper",
+            aspect="auto",
+            cmap=cmap,
+            norm=norm,
+            extent=(t1,t2,dp1,dp2)
+        )
+        axi.set_yticks(log_minorticks,minor=True)
+        axi.set_yticks(log_majorticks)
+        axi.set_ylim((dp1,dp2))
+        
+        axi.set_xlim((t1,t2))
+        axi.set_xticks(pd.date_range(
+            dts.num2date(t1),dts.num2date(t2),freq=xminortick_interval),minor=True)
+        axi.set_xticks(pd.date_range(
+            dts.num2date(t1),dts.num2date(t2),freq=xmajortick_interval))
+        
+        if keep_inner_ticklabels==False:
+            if axi in first_col_ax:
+                axi.set_yticklabels(log_majorticklabels,fontsize=font_size)
             else:
-                log_tick_labels.append('')
+                axi.set_yticklabels([])
+                
+            if axi in last_row_ax:    
+                axi.set_xticklabels(pd.date_range(
+                    dts.num2date(t1),dts.num2date(t2),freq=xmajortick_interval).
+                    strftime(xticklabel_format),fontsize=font_size)           
+                for tick in axi.get_xticklabels():
+                    tick.set_rotation(45)
+                    tick.set_ha("right")
+                    tick.set_rotation_mode("anchor")
+            else:
+                axi.set_xticklabels([])
+        else:
+            axi.set_yticklabels(log_majorticklabels,fontsize=font_size)
+            axi.set_xticklabels(pd.date_range(
+                dts.num2date(t1),dts.num2date(t2),freq=xmajortick_interval).
+                strftime(xticklabel_format),fontsize=font_size)
+            for tick in axi.get_xticklabels():
+                tick.set_rotation(45)
+                tick.set_ha("right")
+                tick.set_rotation_mode("anchor")
+        
+        if label_subplots:
+            axi.text(.01, .99, labels[i], ha='left', va='top', 
+                color=label_color, transform=axi.transAxes, fontsize=font_size)
 
-    log_ticks=np.array(log_ticks)
-    return log_ticks,log_tick_labels
+    if column_titles is not None:
+        for column_title,axy in zip(column_titles,first_row_ax):
+            axy.set_title(column_title,fontsize=font_size)
+    
+    if columns>1:
+        xspace = (size[0]-columns*ax_width)/(columns-1.0)
+    else:
+        xspace = (size[1]-rows*ax_height)/(rows-1.0)
+    
+    c_handle = plt.axes([origin[0] + size[0] + xspace, origin[1], 0.02, size[1]])
+    cbar = plt.colorbar(img,cax=c_handle)
+    cbar.ax.tick_params(labelsize=font_size)
+    cbar.set_label("$dN/dlogD_p$, [cm$^{-3}$]")
 
-def plot_sumfile(
+    return fig,ax    
+
+def plot_aerosol_dist(
     v,
-    ax=None,
-    vmin=10,
-    vmax=100000,
-    time_reso=2,
-    time_formatter="%H:%M"):    
+    ax,
+    cmap=cm.rainbow,
+    norm=colors.Normalize(10,10000),
+    xminortick_interval="1H",
+    xmajortick_interval="2H",
+    xticklabel_format="%H:%M"):    
     """ 
     Plot aerosol particle number-size distribution surface plot
 
     Parameters
     ----------
 
-    v : pandas.DataFrame
-        Aerosol number size distribution
-
-        time (index) should be have constant resolution, 
-        otherwise the time axis will not be correct
-
+    v : pandas.DataFrame or list of pandas.DataFrames
+        Aerosol number size distribution (continuous index)
     ax : axes object
         axis on which to plot the data
-        if `None` the axis are created
-
-    vmin : float or int
-        color scale lower limit
-
-    vmax : float or int
-        color scale upper limit
-
-    time_reso : `int`
-        Time resolution of ticks given in hours
-
-    time_formatter : `str`
-        Define the format of time ticklabels
+    cmap :  matplotlib colormap
+        Colormap to use, default is rainbow    
+    norm : matplotlib.colors norm
+        Define how to normalize the colors.
+        Default is linear normalization
+    xminortick_interval : str
+        A pandas date frequency string
         
+        See for all options here: 
+        https://pandas.pydata.org/pandas-docs/stable/user_guide/timeseries.html#offset-aliases
+    xmajortick_interval : str
+        A pandas date frequency string
+    xticklabel_format : str
+        Date format string
+        
+        See for all options here: 
+        https://docs.python.org/3/library/datetime.html#strftime-and-strptime-format-code
+     
     """
-
-    if ax is None:
-        fig,handle = plt.subplots(figsize=(10,4))
-    else:
-        handle=ax
-
+    handle = ax
+    box = handle.get_position()
+    origin = (box.x0,box.y0) 
+    size = (box.width,box.height)
+    handle.set_ylabel('$D_p$, [m]')
+    
+    tim = v.index
     dp = v.columns.values.astype(float)
     dndlogdp = v.values.astype(float)
 
-    log_ticks,log_tick_labels = generate_log_ticks(-10,-4)
-
-    norm = colors.LogNorm(vmin=vmin,vmax=vmax)
-    color_ticks = LogLocator(subs=range(10))
-
-    handle.set_yticks(log_ticks)
-    handle.set_yticklabels(log_tick_labels)
-
-    if v.index[0].utcoffset() is None:
-        t1=dts.date2num(v.index[0])+v.index[0].second/(60.*60.*24.)
-        t2=dts.date2num(v.index[-1])+v.index[-1].second/(60.*60.*24.)
-    else:
-        t1=dts.date2num(v.index[0])+v.index[0].utcoffset().seconds/(60.*60.*24.)
-        t2=dts.date2num(v.index[-1])+v.index[-1].utcoffset().seconds/(60.*60.*24.)
-
+    log_minorticks,log_majorticks,log_majorticklabels = generate_log_ticks(-10,-4)
+    handle.set_yticks(log_minorticks,minor=True)
+    handle.set_yticks(log_majorticks)
+    handle.set_yticklabels(log_majorticklabels)
+    
+    t1=dts.date2num(tim[0])
+    t2=dts.date2num(tim[-1])
     dp1=np.log10(dp.min())
     dp2=np.log10(dp.max())
 
@@ -229,31 +315,34 @@ def plot_sumfile(
         np.flipud(dndlogdp.T),
         origin="upper",
         aspect="auto",
-        cmap="turbo",
+        cmap=cmap,
         norm=norm,
         extent=(t1,t2,dp1,dp2)
     )
 
-    handle.xaxis.set_major_locator(dts.HourLocator(interval=time_reso))
-    handle.xaxis.set_major_formatter(dts.DateFormatter(time_formatter))
-    plt.setp(handle.get_xticklabels(),rotation=80)
+    handle.set_ylim((dp1,dp2))
+    handle.set_xlim((t1,t2))
+    handle.set_xticks(pd.date_range(
+        dts.num2date(t1),dts.num2date(t2),freq=xminortick_interval),minor=True)
+    handle.set_xticks(pd.date_range(
+        dts.num2date(t1),dts.num2date(t2),freq=xmajortick_interval))
+    handle.set_xticklabels(pd.date_range(
+        dts.num2date(t1),dts.num2date(t2),freq=xmajortick_interval).
+        strftime(xticklabel_format))
+        
+    for tick in handle.get_xticklabels():
+        tick.set_rotation(45)
+        tick.set_ha("right")
+        tick.set_rotation_mode("anchor")
 
-    box = handle.get_position()
-    c_handle = plt.axes([box.x0*1.025 + box.width * 1.025, box.y0, 0.01, box.height])
-    cbar = plt.colorbar(img,cax=c_handle,ticks=color_ticks)
-
-    handle.set_ylabel('Dp, [m]')
-    handle.set_xlabel('Time')
-    cbar.set_label('dN/dlogDp, [cm-3]')
-
-    if ax is None:
-        plt.show()
+    c_handle = plt.axes([origin[0]*1.03 + size[0]*1.03, origin[1], 0.02, size[1]])
+    cbar = plt.colorbar(img,cax=c_handle)
+    cbar.set_label('$dN/dlogD_p$, [cm$^{-3}$]')
 
 def dndlogdp2dn(df):
     """    
     Convert from normalized number concentrations to
-    unnormalized number concentrations assuming that 
-    the size channels have common edges.
+    unnormalized number concentrations.
 
     Parameters
     ----------
@@ -279,8 +368,7 @@ def dndlogdp2dn(df):
 
 def air_viscosity(temp):
     """ 
-    Calculate air viscosity
-    using Enskog-Chapman theory
+    Calculate air viscosity using Enskog-Chapman theory
 
     Parameters
     ----------
@@ -308,16 +396,15 @@ def mean_free_path(temp,pres):
     Parameters
     ----------
 
-    temp : float, array or dataframe
+    temp : float or numpy.array
         air temperature, unit: K  
-
-    pres : float, array or dataframe
+    pres : float or numpy.array
         air pressure, unit: Pa
 
     Returns
     -------
 
-    float, array or dataframe
+    float or numpy.array
         mean free path in air, unit: m
 
     """
@@ -336,10 +423,8 @@ def slipcorr(dp,temp,pres):
 
     dp : float or numpy array (m,)
         particle diameter, unit m 
-
     temp : float or numpy.array (n,1)
         air temperature, unit K 
-
     pres : float or numpy.array (n,1)
         air pressure, unit Pa
 
@@ -366,10 +451,8 @@ def particle_diffusivity(dp,temp,pres):
 
     dp : float or numpy.array (m,) 
         particle diameter, unit: m 
-
     temp : float or numpy.array (n,1)
         air temperature, unit: K 
-
     pres : float or numpy.array (n,1)
         air pressure, unit: Pa
 
@@ -398,7 +481,6 @@ def particle_thermal_speed(dp,temp):
 
     dp : float or numpy.array (m,)
         particle diameter, unit: m 
-
     temp : float or numpy.array (n,1)
         air temperature, unit: K 
 
@@ -426,10 +508,8 @@ def particle_mean_free_path(dp,temp,pres):
 
     dp : float or numpy.array (m,)
         particle diameter, unit: m 
-
     temp : float or numpy.array (n,1)
         air temperature, unit: K 
-
     pres : float or numpy.array (n,1)
         air pressure, unit: Pa
 
@@ -455,13 +535,10 @@ def coagulation_coef(dp1,dp2,temp,pres):
 
     dp1 : float or numpy.array (m,)
         first particle diameter, unit: m 
-
     dp2 : float or numpy.array (m,)
         second particle diameter, unit: m 
-
     temp : float or numpy.array (n,1)
         air temperature, unit: K 
-
     pres : float or numpy.array (n,1)
         air pressure, unit: Pa
 
@@ -507,16 +584,13 @@ def calc_coags(df,dp,temp,pres):
 
     df : pandas.DataFrame
         Aerosol number size distribution
-
     dp : float or array
         Particle diameter(s) for which you want to calculate the CoagS, 
         unit: m
-
-    temp : pandas.DataFrame or float
+    temp : pandas.Series or float
         Ambient temperature corresponding to the data, unit: K
         If single value given it is used for all data
-
-    pres : pandas.DataFrame or float
+    pres : pandas.Series or float
         Ambient pressure corresponding to the data, unit: Pa
         If single value given it is used for all data
 
@@ -530,12 +604,12 @@ def calc_coags(df,dp,temp,pres):
     """
 
     if isinstance(temp,float):
-        temp = pd.DataFrame(index = df.index, columns=["Temperature"], data=temp)
+        temp = pd.Series(index=df.index, data=temp)
     else:
         temp = temp.reindex(df.index, method="nearest")
 
     if isinstance(pres,float):
-        pres = pd.DataFrame(index = df.index, columns=["Pressure"], data=pres)
+        pres = pd.Series(index=df.index, data=pres)
     else:
         pres = pres.reindex(df.index, method="nearest")
 
@@ -563,15 +637,12 @@ def diam2mob(dp,temp,pres,ne):
     dp : float or numpy.array (m,)
         particle diameter(s),
         unit : m
-
     temp : float or numpy.array (n,1)
         ambient temperature, 
         unit: K
-
     pres : float or numpy.array (n,1)
         ambient pressure, 
         unit: Pa
-
     ne : int
         number of charges on the aerosol particle
 
@@ -602,15 +673,12 @@ def mob2diam(Zp,temp,pres,ne):
     Zp : float
         particle electrical mobility or mobilities, 
         unit: m2 s-1 V-1
-
     temp : float
         ambient temperature, 
         unit: K
-
     pres : float
         ambient pressure, 
         unit: Pa
-
     ne : integer
         number of charges on the aerosol particle
 
@@ -643,23 +711,18 @@ def binary_diffusivity(temp,pres,Ma,Mb,Va,Vb):
     temp : float or numpy.array
         temperature, 
         unit: K
-
     pres : float or numpy.array
         pressure, 
         unit: Pa
-
     Ma : float
         relative molecular mass of gas a, 
         unit: dimensionless
-
     Mb : float
         relative molecular mass of gas b, 
         unit: dimensionless
-
     Va : float
         diffusion volume of gas a, 
         unit: dimensionless
-
     Vb : float
         diffusion volume of gas b, 
         unit: dimensionless
@@ -689,19 +752,15 @@ def beta(dp,temp,pres,diffusivity,molar_mass):
     dp : float or numpy.array (m,)
         aerosol particle diameter(s), 
         unit: m
-
     temp : float or numpy.array (n,1)
         temperature, 
         unit: K
-
     pres : float or numpy.array (n,1)
         pressure,
         unit: Pa
-
     diffusivity : float or numpy.array (n,1)
         diffusivity of the gas that is condensing, 
         unit: m2/s
-
     molar_mass : float
         molar mass of the condensing gas, 
         unit: g/mol
@@ -709,7 +768,7 @@ def beta(dp,temp,pres,diffusivity,molar_mass):
     Returns
     -------
 
-    float or numpy.array
+    float or numpy.array (n,m)
         Fuchs Sutugin correction factor for each particle diameter and 
         temperature/pressure 
         unit: m2/s
@@ -726,7 +785,7 @@ def calc_cs(df,temp,pres):
     """
     Calculate condensation sink, assuming that the condensing gas is sulfuric acid in air
     with aerosol particles.
-
+    
     Kulmala et al (2012): doi:10.1038/nprot.2012.091 
 
     Parameters
@@ -734,12 +793,10 @@ def calc_cs(df,temp,pres):
 
     df : pandas.DataFrame
         aerosol number size distribution (dN/dlogDp)
-
-    temp : pandas.DataFrame or float
+    temp : pandas.Series or float
         Ambient temperature corresponding to the data, unit: K
         If single value given it is used for all data
-
-    pres : pandas.DataFrame or float
+    pres : pandas.Series or float
         Ambient pressure corresponding to the data, unit: Pa
         If single value given it is used for all data
 
@@ -752,12 +809,12 @@ def calc_cs(df,temp,pres):
     """
     
     if isinstance(temp,float):
-        temp = pd.DataFrame(index = df.index, columns=["Temperature"], data=temp)
+        temp = pd.Series(index = df.index, data=temp)
     else:
         temp = temp.reindex(df.index, method="nearest")
 
     if isinstance(pres,float):
-        pres = pd.DataFrame(index = df.index, columns=["Pressure"], data=pres)
+        pres = pd.Series(index = df.index, data=pres)
     else:
         pres = pres.reindex(df.index, method="nearest")
 
@@ -776,7 +833,7 @@ def calc_cs(df,temp,pres):
 
     df2 = (1e6*dn*(b*dp)).sum(axis=1,min_count=1)
 
-    cs = (4.*np.pi*diffu.flatten())*df2.values
+    cs = (4.*np.pi*diffu)*df2.values
 
     return pd.Series(index=df.index,data=cs)
 
@@ -790,10 +847,8 @@ def calc_conc(df,dmin,dmax):
 
     df : pandas.DataFrame
         Aerosol number-size distribution
-
     dmin : float or array
         Size range lower diameter(s), unit: m
-
     dmax : float or array
         Size range upper diameter(s), unit: m
 
@@ -841,7 +896,7 @@ def calc_formation_rate(
     gr):
     """
     Calculate particle formation rate
-
+    
     Kulmala et al (2012): doi:10.1038/nprot.2012.091
 
     Parameters
@@ -849,14 +904,11 @@ def calc_formation_rate(
     
     dp1 : float or array
         Lower diameter of the size range(s), unit: m
-
     dp2 : float or array
         Upper diameter of the size range(s), unit m
-
     conc : pandas.DataFrame
         particle number concentration timeseries
         in the size range(s), unit cm-3
-
     coags : pandas.DataFrame
         Coagulation sink timeseries for particles 
         in the size range(s). unit s-1 
@@ -864,7 +916,6 @@ def calc_formation_rate(
         Usually approximated as coagulation sink for particle size
         in the lower limit of the size range, 
         unit s-1
-
     gr : float or array
         Growth rate for particles out of the size range(s), 
         unit nm h-1
@@ -904,39 +955,31 @@ def calc_ion_formation_rate(
     gr):
     """ 
     Calculate ion formation rate
-
+    
     Kulmala et al (2012): doi:10.1038/nprot.2012.091
 
     Parameters
     ----------
 
-    dp1 : float or array
+    dp1 : float or numpy.array
         Lower diameter of the size range(s), unit: m
-
-    dp2 : float or array
+    dp2 : float or numpy.array
         Upper diameter of the size range(s), unit: m
-
     conc_pos : pandas.DataFrame
         Positive ion number concentration in the size range(s), unit: cm-3. 
         Each size range corresponds to a column in the dataframe
-
     conc_neg : pandas.DataFrame
         Negative ion number concentration in the size range(s), unit: cm-3
-
     conc_pos_small : pandas.DataFrame
         Positive ion number concentration for ions smaller than size range(s), unit: cm-3
-
     conc_neg_small : pandas.DataFrame
         Negative ion number concentration for ions smaller than size range(s), unit: cm-3
-
     conc : pandas.DataFrame
         Particle number concentration in the size range(s), unit: cm-3
-
     coags : pandas.DataFrame
         Coagulation sink for particles in the size range(s).
         unit: s-1
-
-    gr : float or array
+    gr : float or numpy.array
         Growth rate for particles out of the size range(s), unit: nm h-1
 
     Returns
@@ -944,7 +987,6 @@ def calc_ion_formation_rate(
 
     pandas.DataFrame
         Negative ion formation rate(s), unit : cm3 s-1
-
     pandas.DataFrame    
         Positive ion formation rate(s), unit: cm3 s-1
 

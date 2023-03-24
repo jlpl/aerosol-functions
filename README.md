@@ -1,6 +1,6 @@
 # Aerosol functions
-A collection of functions to analyze atmospheric aerosol data.
-```shell
-pip install aerosol-functions
-```
-[Documentation](https://jlpl.github.io/aerosol-functions/)
+A collection of functions to analyze and visualize atmospheric aerosol data.
+
+Install using `pip install aerosol-functions`
+
+See the [documentation](https://jlpl.github.io/aerosol-functions/)
