@@ -1,3 +1,5 @@
+![logo](logo.png)
+
 # Aerosol functions
 A collection of functions to analyze and visualize atmospheric aerosol data.
 
