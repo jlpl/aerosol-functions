@@ -1,0 +1,773 @@
+
+<!DOCTYPE html>
+
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.18.1: http://docutils.sourceforge.net/" />
+
+    <title>aerosol package &#8212; aerosol-functions 0.0.7 documentation</title>
+    <link rel="stylesheet" type="text/css" href="_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="_static/alabaster.css" />
+    <script data-url_root="./" id="documentation_options" src="_static/documentation_options.js"></script>
+    <script src="_static/doctools.js"></script>
+    <script src="_static/sphinx_highlight.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="prev" title="&lt;no title&gt;" href="modules.html" />
+   
+  <link rel="stylesheet" href="_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="aerosol-package">
+<h1>aerosol package<a class="headerlink" href="#aerosol-package" title="Permalink to this heading">¶</a></h1>
+<section id="module-aerosol.functions">
+<span id="aerosol-functions-module"></span><h2>aerosol.functions module<a class="headerlink" href="#module-aerosol.functions" title="Permalink to this heading">¶</a></h2>
+<dl class="py function">
+<dt class="sig sig-object py" id="aerosol.functions.air_viscosity">
+<span class="sig-prename descclassname"><span class="pre">aerosol.functions.</span></span><span class="sig-name descname"><span class="pre">air_viscosity</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">temp</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#aerosol.functions.air_viscosity" title="Permalink to this definition">¶</a></dt>
+<dd><p>Calculate air viscosity using Enskog-Chapman theory</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><dl class="simple">
+<dt><strong>temp</strong><span class="classifier">float or numpy.array</span></dt><dd><p>air temperature, unit: K</p>
+</dd>
+</dl>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><dl class="simple">
+<dt>float or numpy.array</dt><dd><p>viscosity of air, unit: m2 s-1</p>
+</dd>
+</dl>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="aerosol.functions.beta">
+<span class="sig-prename descclassname"><span class="pre">aerosol.functions.</span></span><span class="sig-name descname"><span class="pre">beta</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">dp</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">temp</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">pres</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">diffusivity</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">molar_mass</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#aerosol.functions.beta" title="Permalink to this definition">¶</a></dt>
+<dd><p>Calculate Fuchs Sutugin correction factor</p>
+<p>Sutugin et al. (1971): <a class="reference external" href="https://doi.org/10.1016/0021-8502(71)90061-9">https://doi.org/10.1016/0021-8502(71)90061-9</a></p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><dl class="simple">
+<dt><strong>dp</strong><span class="classifier">float or numpy.array (m,)</span></dt><dd><p>aerosol particle diameter(s), 
+unit: m</p>
+</dd>
+<dt><strong>temp</strong><span class="classifier">float or numpy.array (n,1)</span></dt><dd><p>temperature, 
+unit: K</p>
+</dd>
+<dt><strong>pres</strong><span class="classifier">float or numpy.array (n,1)</span></dt><dd><p>pressure,
+unit: Pa</p>
+</dd>
+<dt><strong>diffusivity</strong><span class="classifier">float or numpy.array (n,1)</span></dt><dd><p>diffusivity of the gas that is condensing, 
+unit: m2/s</p>
+</dd>
+<dt><strong>molar_mass</strong><span class="classifier">float</span></dt><dd><p>molar mass of the condensing gas, 
+unit: g/mol</p>
+</dd>
+</dl>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><dl class="simple">
+<dt>float or numpy.array (n,m)</dt><dd><p>Fuchs Sutugin correction factor for each particle diameter and 
+temperature/pressure 
+unit: m2/s</p>
+</dd>
+</dl>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="aerosol.functions.binary_diffusivity">
+<span class="sig-prename descclassname"><span class="pre">aerosol.functions.</span></span><span class="sig-name descname"><span class="pre">binary_diffusivity</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">temp</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">pres</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">Ma</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">Mb</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">Va</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">Vb</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#aerosol.functions.binary_diffusivity" title="Permalink to this definition">¶</a></dt>
+<dd><p>Binary diffusivity in a mixture of gases a and b</p>
+<p>Fuller et al. (1966): <a class="reference external" href="https://doi.org/10.1021/ie50677a007">https://doi.org/10.1021/ie50677a007</a></p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><dl class="simple">
+<dt><strong>temp</strong><span class="classifier">float or numpy.array</span></dt><dd><p>temperature, 
+unit: K</p>
+</dd>
+<dt><strong>pres</strong><span class="classifier">float or numpy.array</span></dt><dd><p>pressure, 
+unit: Pa</p>
+</dd>
+<dt><strong>Ma</strong><span class="classifier">float</span></dt><dd><p>relative molecular mass of gas a, 
+unit: dimensionless</p>
+</dd>
+<dt><strong>Mb</strong><span class="classifier">float</span></dt><dd><p>relative molecular mass of gas b, 
+unit: dimensionless</p>
+</dd>
+<dt><strong>Va</strong><span class="classifier">float</span></dt><dd><p>diffusion volume of gas a, 
+unit: dimensionless</p>
+</dd>
+<dt><strong>Vb</strong><span class="classifier">float</span></dt><dd><p>diffusion volume of gas b, 
+unit: dimensionless</p>
+</dd>
+</dl>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><dl class="simple">
+<dt>float or numpy.array</dt><dd><p>binary diffusivity, 
+unit: m2 s-1</p>
+</dd>
+</dl>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="aerosol.functions.calc_coags">
+<span class="sig-prename descclassname"><span class="pre">aerosol.functions.</span></span><span class="sig-name descname"><span class="pre">calc_coags</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">df</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dp</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">temp</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">pres</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#aerosol.functions.calc_coags" title="Permalink to this definition">¶</a></dt>
+<dd><p>Calculate coagulation sink</p>
+<p>Kulmala et al (2012): doi:10.1038/nprot.2012.091</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><dl class="simple">
+<dt><strong>df</strong><span class="classifier">pandas.DataFrame</span></dt><dd><p>Aerosol number size distribution</p>
+</dd>
+<dt><strong>dp</strong><span class="classifier">float or array</span></dt><dd><p>Particle diameter(s) for which you want to calculate the CoagS, 
+unit: m</p>
+</dd>
+<dt><strong>temp</strong><span class="classifier">pandas.Series or float</span></dt><dd><p>Ambient temperature corresponding to the data, unit: K
+If single value given it is used for all data</p>
+</dd>
+<dt><strong>pres</strong><span class="classifier">pandas.Series or float</span></dt><dd><p>Ambient pressure corresponding to the data, unit: Pa
+If single value given it is used for all data</p>
+</dd>
+</dl>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><dl class="simple">
+<dt>pandas.DataFrame</dt><dd><p>Coagulation sink for the given diamater(s),
+unit: s-1</p>
+</dd>
+</dl>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="aerosol.functions.calc_conc">
+<span class="sig-prename descclassname"><span class="pre">aerosol.functions.</span></span><span class="sig-name descname"><span class="pre">calc_conc</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">df</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dmin</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dmax</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#aerosol.functions.calc_conc" title="Permalink to this definition">¶</a></dt>
+<dd><p>Calculate particle number concentration from aerosol 
+number-size distribution</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><dl class="simple">
+<dt><strong>df</strong><span class="classifier">pandas.DataFrame</span></dt><dd><p>Aerosol number-size distribution</p>
+</dd>
+<dt><strong>dmin</strong><span class="classifier">float or array</span></dt><dd><p>Size range lower diameter(s), unit: m</p>
+</dd>
+<dt><strong>dmax</strong><span class="classifier">float or array</span></dt><dd><p>Size range upper diameter(s), unit: m</p>
+</dd>
+</dl>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><dl class="simple">
+<dt>pandas.DataFrame</dt><dd><p>Number concentration in the given size range(s), unit: cm-3</p>
+</dd>
+</dl>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="aerosol.functions.calc_cs">
+<span class="sig-prename descclassname"><span class="pre">aerosol.functions.</span></span><span class="sig-name descname"><span class="pre">calc_cs</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">df</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">temp</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">pres</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#aerosol.functions.calc_cs" title="Permalink to this definition">¶</a></dt>
+<dd><p>Calculate condensation sink, assuming that the condensing gas is sulfuric acid in air
+with aerosol particles.</p>
+<p>Kulmala et al (2012): doi:10.1038/nprot.2012.091</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><dl class="simple">
+<dt><strong>df</strong><span class="classifier">pandas.DataFrame</span></dt><dd><p>aerosol number size distribution (dN/dlogDp)</p>
+</dd>
+<dt><strong>temp</strong><span class="classifier">pandas.Series or float</span></dt><dd><p>Ambient temperature corresponding to the data, unit: K
+If single value given it is used for all data</p>
+</dd>
+<dt><strong>pres</strong><span class="classifier">pandas.Series or float</span></dt><dd><p>Ambient pressure corresponding to the data, unit: Pa
+If single value given it is used for all data</p>
+</dd>
+</dl>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><dl class="simple">
+<dt>pandas.Series</dt><dd><p>condensation sink time series, unit: s-1</p>
+</dd>
+</dl>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="aerosol.functions.calc_formation_rate">
+<span class="sig-prename descclassname"><span class="pre">aerosol.functions.</span></span><span class="sig-name descname"><span class="pre">calc_formation_rate</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">dp1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dp2</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">conc</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">coags</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">gr</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#aerosol.functions.calc_formation_rate" title="Permalink to this definition">¶</a></dt>
+<dd><p>Calculate particle formation rate</p>
+<p>Kulmala et al (2012): doi:10.1038/nprot.2012.091</p>
+<dl class="field-list">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><dl>
+<dt><strong>dp1</strong><span class="classifier">float or array</span></dt><dd><p>Lower diameter of the size range(s), unit: m</p>
+</dd>
+<dt><strong>dp2</strong><span class="classifier">float or array</span></dt><dd><p>Upper diameter of the size range(s), unit m</p>
+</dd>
+<dt><strong>conc</strong><span class="classifier">pandas.DataFrame</span></dt><dd><p>particle number concentration timeseries
+in the size range(s), unit cm-3</p>
+</dd>
+<dt><strong>coags</strong><span class="classifier">pandas.DataFrame</span></dt><dd><p>Coagulation sink timeseries for particles 
+in the size range(s). unit s-1</p>
+<p>Usually approximated as coagulation sink for particle size
+in the lower limit of the size range, 
+unit s-1</p>
+</dd>
+<dt><strong>gr</strong><span class="classifier">float or array</span></dt><dd><p>Growth rate for particles out of the size range(s), 
+unit nm h-1</p>
+</dd>
+</dl>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><dl class="simple">
+<dt>pandas.DataFrame</dt><dd><p>particle formation rate for diameter(s), unit: cm3 s-1</p>
+</dd>
+</dl>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="aerosol.functions.calc_ion_formation_rate">
+<span class="sig-prename descclassname"><span class="pre">aerosol.functions.</span></span><span class="sig-name descname"><span class="pre">calc_ion_formation_rate</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">dp1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dp2</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">conc_pos</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">conc_neg</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">conc_pos_small</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">conc_neg_small</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">conc</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">coags</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">gr</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#aerosol.functions.calc_ion_formation_rate" title="Permalink to this definition">¶</a></dt>
+<dd><p>Calculate ion formation rate</p>
+<p>Kulmala et al (2012): doi:10.1038/nprot.2012.091</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><dl class="simple">
+<dt><strong>dp1</strong><span class="classifier">float or numpy.array</span></dt><dd><p>Lower diameter of the size range(s), unit: m</p>
+</dd>
+<dt><strong>dp2</strong><span class="classifier">float or numpy.array</span></dt><dd><p>Upper diameter of the size range(s), unit: m</p>
+</dd>
+<dt><strong>conc_pos</strong><span class="classifier">pandas.DataFrame</span></dt><dd><p>Positive ion number concentration in the size range(s), unit: cm-3. 
+Each size range corresponds to a column in the dataframe</p>
+</dd>
+<dt><strong>conc_neg</strong><span class="classifier">pandas.DataFrame</span></dt><dd><p>Negative ion number concentration in the size range(s), unit: cm-3</p>
+</dd>
+<dt><strong>conc_pos_small</strong><span class="classifier">pandas.DataFrame</span></dt><dd><p>Positive ion number concentration for ions smaller than size range(s), unit: cm-3</p>
+</dd>
+<dt><strong>conc_neg_small</strong><span class="classifier">pandas.DataFrame</span></dt><dd><p>Negative ion number concentration for ions smaller than size range(s), unit: cm-3</p>
+</dd>
+<dt><strong>conc</strong><span class="classifier">pandas.DataFrame</span></dt><dd><p>Particle number concentration in the size range(s), unit: cm-3</p>
+</dd>
+<dt><strong>coags</strong><span class="classifier">pandas.DataFrame</span></dt><dd><p>Coagulation sink for particles in the size range(s).
+unit: s-1</p>
+</dd>
+<dt><strong>gr</strong><span class="classifier">float or numpy.array</span></dt><dd><p>Growth rate for particles out of the size range(s), unit: nm h-1</p>
+</dd>
+</dl>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><dl class="simple">
+<dt>pandas.DataFrame</dt><dd><p>Negative ion formation rate(s), unit : cm3 s-1</p>
+</dd>
+<dt>pandas.DataFrame</dt><dd><p>Positive ion formation rate(s), unit: cm3 s-1</p>
+</dd>
+</dl>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="aerosol.functions.coagulation_coef">
+<span class="sig-prename descclassname"><span class="pre">aerosol.functions.</span></span><span class="sig-name descname"><span class="pre">coagulation_coef</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">dp1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dp2</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">temp</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">pres</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#aerosol.functions.coagulation_coef" title="Permalink to this definition">¶</a></dt>
+<dd><p>Calculate Brownian coagulation coefficient (Fuchs)</p>
+<dl class="field-list">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><dl class="simple">
+<dt><strong>dp1</strong><span class="classifier">float or numpy.array (m,)</span></dt><dd><p>first particle diameter, unit: m</p>
+</dd>
+<dt><strong>dp2</strong><span class="classifier">float or numpy.array (m,)</span></dt><dd><p>second particle diameter, unit: m</p>
+</dd>
+<dt><strong>temp</strong><span class="classifier">float or numpy.array (n,1)</span></dt><dd><p>air temperature, unit: K</p>
+</dd>
+<dt><strong>pres</strong><span class="classifier">float or numpy.array (n,1)</span></dt><dd><p>air pressure, unit: Pa</p>
+</dd>
+</dl>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><dl>
+<dt>float or numpy.array</dt><dd><p>Brownian coagulation coefficient (Fuchs),</p>
+<p>for example if all parameters are arrays
+the function returns a 2d array where 
+the entry at i,j correspoinds to the 
+coagulation coefficient for particle sizes
+dp1[i] and dp2[i] at temp[j] and pres[j].</p>
+<p>unit m3 s-1</p>
+</dd>
+</dl>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="aerosol.functions.datenum2datetime">
+<span class="sig-prename descclassname"><span class="pre">aerosol.functions.</span></span><span class="sig-name descname"><span class="pre">datenum2datetime</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">datenum</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#aerosol.functions.datenum2datetime" title="Permalink to this definition">¶</a></dt>
+<dd><p>Convert from matlab datenum to python datetime</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><dl class="simple">
+<dt><strong>datenum</strong><span class="classifier">float or int</span></dt><dd><p>A serial date number representing the whole and 
+fractional number of days from 1-Jan-0000 to a 
+specific date (MATLAB datenum)</p>
+</dd>
+</dl>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><dl class="simple">
+<dt>pandas.Timestamp</dt><dd></dd>
+</dl>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="aerosol.functions.datetime2datenum">
+<span class="sig-prename descclassname"><span class="pre">aerosol.functions.</span></span><span class="sig-name descname"><span class="pre">datetime2datenum</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">dt</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#aerosol.functions.datetime2datenum" title="Permalink to this definition">¶</a></dt>
+<dd><p>Convert from python datetime to matlab datenum</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><dl class="simple">
+<dt><strong>dt</strong><span class="classifier">datetime object</span></dt><dd></dd>
+</dl>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><dl class="simple">
+<dt>float</dt><dd><p>A serial date number representing the whole and 
+fractional number of days from 1-Jan-0000 to a 
+specific date (MATLAB datenum)</p>
+</dd>
+</dl>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="aerosol.functions.diam2mob">
+<span class="sig-prename descclassname"><span class="pre">aerosol.functions.</span></span><span class="sig-name descname"><span class="pre">diam2mob</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">dp</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">temp</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">pres</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ne</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#aerosol.functions.diam2mob" title="Permalink to this definition">¶</a></dt>
+<dd><p>Convert electrical mobility diameter to electrical mobility in air</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><dl class="simple">
+<dt><strong>dp</strong><span class="classifier">float or numpy.array (m,)</span></dt><dd><p>particle diameter(s),
+unit : m</p>
+</dd>
+<dt><strong>temp</strong><span class="classifier">float or numpy.array (n,1)</span></dt><dd><p>ambient temperature, 
+unit: K</p>
+</dd>
+<dt><strong>pres</strong><span class="classifier">float or numpy.array (n,1)</span></dt><dd><p>ambient pressure, 
+unit: Pa</p>
+</dd>
+<dt><strong>ne</strong><span class="classifier">int</span></dt><dd><p>number of charges on the aerosol particle</p>
+</dd>
+</dl>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><dl class="simple">
+<dt>float or numpy.array</dt><dd><p>particle electrical mobility or mobilities, 
+unit: m2 s-1 V-1</p>
+</dd>
+</dl>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="aerosol.functions.dndlogdp2dn">
+<span class="sig-prename descclassname"><span class="pre">aerosol.functions.</span></span><span class="sig-name descname"><span class="pre">dndlogdp2dn</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">df</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#aerosol.functions.dndlogdp2dn" title="Permalink to this definition">¶</a></dt>
+<dd><p>Convert from normalized number concentrations to
+unnormalized number concentrations.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><dl class="simple">
+<dt><strong>df</strong><span class="classifier">pandas.DataFrame</span></dt><dd><p>Aerosol number-size distribution (dN/dlogDp)</p>
+</dd>
+</dl>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><dl class="simple">
+<dt>pandas.DataFrame</dt><dd><p>Aerosol number size distribution (dN)</p>
+</dd>
+</dl>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="aerosol.functions.generate_log_ticks">
+<span class="sig-prename descclassname"><span class="pre">aerosol.functions.</span></span><span class="sig-name descname"><span class="pre">generate_log_ticks</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">min_exp</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">max_exp</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#aerosol.functions.generate_log_ticks" title="Permalink to this definition">¶</a></dt>
+<dd><p>Generate ticks and ticklabels for log axis</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><dl class="simple">
+<dt><strong>min_exp</strong><span class="classifier">int</span></dt><dd><p>The exponent in the smallest power of ten</p>
+</dd>
+<dt><strong>max_exp</strong><span class="classifier">int</span></dt><dd><p>The exponent in the largest power of ten</p>
+</dd>
+</dl>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><dl class="simple">
+<dt>numpy.array</dt><dd><p>tick values</p>
+</dd>
+<dt>list of str</dt><dd><p>tick labels for each power of ten</p>
+</dd>
+</dl>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="aerosol.functions.mean_free_path">
+<span class="sig-prename descclassname"><span class="pre">aerosol.functions.</span></span><span class="sig-name descname"><span class="pre">mean_free_path</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">temp</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">pres</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#aerosol.functions.mean_free_path" title="Permalink to this definition">¶</a></dt>
+<dd><p>Calculate mean free path in air</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><dl class="simple">
+<dt><strong>temp</strong><span class="classifier">float or numpy.array</span></dt><dd><p>air temperature, unit: K</p>
+</dd>
+<dt><strong>pres</strong><span class="classifier">float or numpy.array</span></dt><dd><p>air pressure, unit: Pa</p>
+</dd>
+</dl>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><dl class="simple">
+<dt>float or numpy.array</dt><dd><p>mean free path in air, unit: m</p>
+</dd>
+</dl>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="aerosol.functions.mob2diam">
+<span class="sig-prename descclassname"><span class="pre">aerosol.functions.</span></span><span class="sig-name descname"><span class="pre">mob2diam</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">Zp</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">temp</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">pres</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ne</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#aerosol.functions.mob2diam" title="Permalink to this definition">¶</a></dt>
+<dd><p>Convert electrical mobility to electrical mobility diameter in air</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><dl class="simple">
+<dt><strong>Zp</strong><span class="classifier">float</span></dt><dd><p>particle electrical mobility or mobilities, 
+unit: m2 s-1 V-1</p>
+</dd>
+<dt><strong>temp</strong><span class="classifier">float</span></dt><dd><p>ambient temperature, 
+unit: K</p>
+</dd>
+<dt><strong>pres</strong><span class="classifier">float</span></dt><dd><p>ambient pressure, 
+unit: Pa</p>
+</dd>
+<dt><strong>ne</strong><span class="classifier">integer</span></dt><dd><p>number of charges on the aerosol particle</p>
+</dd>
+</dl>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><dl class="simple">
+<dt>float</dt><dd><p>particle diameter, unit: m</p>
+</dd>
+</dl>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="aerosol.functions.particle_diffusivity">
+<span class="sig-prename descclassname"><span class="pre">aerosol.functions.</span></span><span class="sig-name descname"><span class="pre">particle_diffusivity</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">dp</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">temp</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">pres</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#aerosol.functions.particle_diffusivity" title="Permalink to this definition">¶</a></dt>
+<dd><p>Particle brownian diffusivity in air</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><dl class="simple">
+<dt><strong>dp</strong><span class="classifier">float or numpy.array (m,)</span></dt><dd><p>particle diameter, unit: m</p>
+</dd>
+<dt><strong>temp</strong><span class="classifier">float or numpy.array (n,1)</span></dt><dd><p>air temperature, unit: K</p>
+</dd>
+<dt><strong>pres</strong><span class="classifier">float or numpy.array (n,1)</span></dt><dd><p>air pressure, unit: Pa</p>
+</dd>
+</dl>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><dl class="simple">
+<dt>float or numpy.array (m,) or (n,m)</dt><dd><p>Brownian diffusivity in air for particles of size dp,
+and at each temperature/pressure value
+unit m2 s-1</p>
+</dd>
+</dl>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="aerosol.functions.particle_mean_free_path">
+<span class="sig-prename descclassname"><span class="pre">aerosol.functions.</span></span><span class="sig-name descname"><span class="pre">particle_mean_free_path</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">dp</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">temp</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">pres</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#aerosol.functions.particle_mean_free_path" title="Permalink to this definition">¶</a></dt>
+<dd><p>Particle mean free path in air</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><dl class="simple">
+<dt><strong>dp</strong><span class="classifier">float or numpy.array (m,)</span></dt><dd><p>particle diameter, unit: m</p>
+</dd>
+<dt><strong>temp</strong><span class="classifier">float or numpy.array (n,1)</span></dt><dd><p>air temperature, unit: K</p>
+</dd>
+<dt><strong>pres</strong><span class="classifier">float or numpy.array (n,1)</span></dt><dd><p>air pressure, unit: Pa</p>
+</dd>
+</dl>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><dl class="simple">
+<dt>float or numpy.array (m,) or (n,m)</dt><dd><p>Particle mean free path for each dp, unit: m</p>
+</dd>
+</dl>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="aerosol.functions.particle_thermal_speed">
+<span class="sig-prename descclassname"><span class="pre">aerosol.functions.</span></span><span class="sig-name descname"><span class="pre">particle_thermal_speed</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">dp</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">temp</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#aerosol.functions.particle_thermal_speed" title="Permalink to this definition">¶</a></dt>
+<dd><p>Particle thermal speed</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><dl class="simple">
+<dt><strong>dp</strong><span class="classifier">float or numpy.array (m,)</span></dt><dd><p>particle diameter, unit: m</p>
+</dd>
+<dt><strong>temp</strong><span class="classifier">float or numpy.array (n,1)</span></dt><dd><p>air temperature, unit: K</p>
+</dd>
+</dl>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><dl class="simple">
+<dt>float or numpy.array (m,) or (n,m)</dt><dd><p>Particle thermal speed for each dp at each temperature 
+point, unit: m s-1</p>
+</dd>
+</dl>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="aerosol.functions.plot_aerosol_dist">
+<span class="sig-prename descclassname"><span class="pre">aerosol.functions.</span></span><span class="sig-name descname"><span class="pre">plot_aerosol_dist</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">v</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ax</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">cmap=&lt;matplotlib.colors.LinearSegmentedColormap</span> <span class="pre">object&gt;</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">norm=&lt;matplotlib.colors.Normalize</span> <span class="pre">object&gt;</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">xminortick_interval='1H'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">xmajortick_interval='2H'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">xticklabel_format='%H:%M'</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#aerosol.functions.plot_aerosol_dist" title="Permalink to this definition">¶</a></dt>
+<dd><p>Plot aerosol particle number-size distribution surface plot</p>
+<dl class="field-list">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><dl>
+<dt><strong>v</strong><span class="classifier">pandas.DataFrame or list of pandas.DataFrames</span></dt><dd><p>Aerosol number size distribution (continuous index)</p>
+</dd>
+<dt><strong>ax</strong><span class="classifier">axes object</span></dt><dd><p>axis on which to plot the data</p>
+</dd>
+<dt><strong>cmap</strong><span class="classifier">matplotlib colormap</span></dt><dd><p>Colormap to use, default is rainbow</p>
+</dd>
+<dt><strong>norm</strong><span class="classifier">matplotlib.colors norm</span></dt><dd><p>Define how to normalize the colors.
+Default is linear normalization</p>
+</dd>
+<dt><strong>xminortick_interval</strong><span class="classifier">str</span></dt><dd><p>A pandas date frequency string</p>
+<p>See for all options here: 
+<a class="reference external" href="https://pandas.pydata.org/pandas-docs/stable/user_guide/timeseries.html#offset-aliases">https://pandas.pydata.org/pandas-docs/stable/user_guide/timeseries.html#offset-aliases</a></p>
+</dd>
+<dt><strong>xmajortick_interval</strong><span class="classifier">str</span></dt><dd><p>A pandas date frequency string</p>
+</dd>
+<dt><strong>xticklabel_format</strong><span class="classifier">str</span></dt><dd><p>Date format string</p>
+<p>See for all options here: 
+<a class="reference external" href="https://docs.python.org/3/library/datetime.html#strftime-and-strptime-format-code">https://docs.python.org/3/library/datetime.html#strftime-and-strptime-format-code</a></p>
+</dd>
+</dl>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="aerosol.functions.slipcorr">
+<span class="sig-prename descclassname"><span class="pre">aerosol.functions.</span></span><span class="sig-name descname"><span class="pre">slipcorr</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">dp</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">temp</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">pres</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#aerosol.functions.slipcorr" title="Permalink to this definition">¶</a></dt>
+<dd><p>Slip correction factor in air</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><dl class="simple">
+<dt><strong>dp</strong><span class="classifier">float or numpy array (m,)</span></dt><dd><p>particle diameter, unit m</p>
+</dd>
+<dt><strong>temp</strong><span class="classifier">float or numpy.array (n,1)</span></dt><dd><p>air temperature, unit K</p>
+</dd>
+<dt><strong>pres</strong><span class="classifier">float or numpy.array (n,1)</span></dt><dd><p>air pressure, unit Pa</p>
+</dd>
+</dl>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><dl class="simple">
+<dt>float or numpy.array (m,) or (n,m)</dt><dd><p>Cunningham slip correction factor for each particle diameter,
+if temperature and pressure and arrays then for each particle 
+diameter at different pressure/temperature values.
+unit dimensionless</p>
+</dd>
+</dl>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="aerosol.functions.subplot_aerosol_dist">
+<span class="sig-prename descclassname"><span class="pre">aerosol.functions.</span></span><span class="sig-name descname"><span class="pre">subplot_aerosol_dist</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">vlist</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">grid</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">cmap=&lt;matplotlib.colors.LinearSegmentedColormap</span> <span class="pre">object&gt;</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">norm=&lt;matplotlib.colors.Normalize</span> <span class="pre">object&gt;</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">xminortick_interval='1H'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">xmajortick_interval='2H'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">xticklabel_format='%H:%M'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">keep_inner_ticklabels=False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">subplot_padding=None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">label_subplots=False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">label_color='white'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">column_titles=None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">font_size=12</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#aerosol.functions.subplot_aerosol_dist" title="Permalink to this definition">¶</a></dt>
+<dd><p>Plot aerosol size distributions (subplots)</p>
+<dl class="field-list">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><dl>
+<dt><strong>vlist</strong><span class="classifier">list of pandas.DataFrames</span></dt><dd><p>Aerosol size distributions (continuous index)</p>
+</dd>
+<dt><strong>grid</strong><span class="classifier">tuple (rows,columns)</span></dt><dd><p>define number of rows and columns</p>
+</dd>
+<dt><strong>cmap</strong><span class="classifier">matplotlib colormap</span></dt><dd><p>Colormap to use, default is rainbow</p>
+</dd>
+<dt><strong>norm</strong><span class="classifier">matplotlib.colors norm</span></dt><dd><p>Define how to normalize the colors.
+Default is linear normalization</p>
+</dd>
+<dt><strong>xminortick_interval</strong><span class="classifier">str</span></dt><dd><p>A pandas date frequency string</p>
+<p>See for all options here: 
+<a class="reference external" href="https://pandas.pydata.org/pandas-docs/stable/user_guide/timeseries.html#offset-aliases">https://pandas.pydata.org/pandas-docs/stable/user_guide/timeseries.html#offset-aliases</a></p>
+</dd>
+<dt><strong>xmajortick_interval</strong><span class="classifier">str</span></dt><dd><p>A pandas date frequency string</p>
+</dd>
+<dt><strong>xticklabel_format</strong><span class="classifier">str</span></dt><dd><p>Date format string</p>
+<p>See for all options here: 
+<a class="reference external" href="https://docs.python.org/3/library/datetime.html#strftime-and-strptime-format-code">https://docs.python.org/3/library/datetime.html#strftime-and-strptime-format-code</a></p>
+</dd>
+<dt><strong>keep_inner_ticklabels</strong><span class="classifier">bool</span></dt><dd><p>If True, use ticklabels in all subplots.
+If False, use ticklabels only on outer subplots.</p>
+</dd>
+<dt><strong>subplot_padding</strong><span class="classifier">number or None</span></dt><dd><p>Adjust space between subplots</p>
+</dd>
+<dt><strong>label_subplots</strong><span class="classifier">bool</span></dt><dd><p>Put labels on subplots</p>
+</dd>
+<dt><strong>label_color</strong><span class="classifier">str</span></dt><dd></dd>
+<dt><strong>column_titles</strong><span class="classifier">list of strings or None</span></dt><dd></dd>
+<dt><strong>font_size</strong><span class="classifier">int</span></dt><dd></dd>
+</dl>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><dl class="simple">
+<dt>figure object</dt><dd></dd>
+<dt>array of axes objects</dt><dd></dd>
+</dl>
+</dd>
+</dl>
+</dd></dl>
+
+</section>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+            <p class="logo"><a href="index.html">
+              <img class="logo" src="_static/logo.png" alt="Logo"/>
+            </a></p>
+<h1 class="logo"><a href="index.html">aerosol-functions</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul class="current">
+<li class="toctree-l1 current"><a class="current reference internal" href="#">aerosol package</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#module-aerosol.functions">aerosol.functions module</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#aerosol.functions.air_viscosity"><code class="docutils literal notranslate"><span class="pre">air_viscosity()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#aerosol.functions.beta"><code class="docutils literal notranslate"><span class="pre">beta()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#aerosol.functions.binary_diffusivity"><code class="docutils literal notranslate"><span class="pre">binary_diffusivity()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#aerosol.functions.calc_coags"><code class="docutils literal notranslate"><span class="pre">calc_coags()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#aerosol.functions.calc_conc"><code class="docutils literal notranslate"><span class="pre">calc_conc()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#aerosol.functions.calc_cs"><code class="docutils literal notranslate"><span class="pre">calc_cs()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#aerosol.functions.calc_formation_rate"><code class="docutils literal notranslate"><span class="pre">calc_formation_rate()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#aerosol.functions.calc_ion_formation_rate"><code class="docutils literal notranslate"><span class="pre">calc_ion_formation_rate()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#aerosol.functions.coagulation_coef"><code class="docutils literal notranslate"><span class="pre">coagulation_coef()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#aerosol.functions.datenum2datetime"><code class="docutils literal notranslate"><span class="pre">datenum2datetime()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#aerosol.functions.datetime2datenum"><code class="docutils literal notranslate"><span class="pre">datetime2datenum()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#aerosol.functions.diam2mob"><code class="docutils literal notranslate"><span class="pre">diam2mob()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#aerosol.functions.dndlogdp2dn"><code class="docutils literal notranslate"><span class="pre">dndlogdp2dn()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#aerosol.functions.generate_log_ticks"><code class="docutils literal notranslate"><span class="pre">generate_log_ticks()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#aerosol.functions.mean_free_path"><code class="docutils literal notranslate"><span class="pre">mean_free_path()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#aerosol.functions.mob2diam"><code class="docutils literal notranslate"><span class="pre">mob2diam()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#aerosol.functions.particle_diffusivity"><code class="docutils literal notranslate"><span class="pre">particle_diffusivity()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#aerosol.functions.particle_mean_free_path"><code class="docutils literal notranslate"><span class="pre">particle_mean_free_path()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#aerosol.functions.particle_thermal_speed"><code class="docutils literal notranslate"><span class="pre">particle_thermal_speed()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#aerosol.functions.plot_aerosol_dist"><code class="docutils literal notranslate"><span class="pre">plot_aerosol_dist()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#aerosol.functions.slipcorr"><code class="docutils literal notranslate"><span class="pre">slipcorr()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#aerosol.functions.subplot_aerosol_dist"><code class="docutils literal notranslate"><span class="pre">subplot_aerosol_dist()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="index.html">Documentation overview</a><ul>
+  <li><a href="modules.html">&lt;no title&gt;</a><ul>
+      <li>Previous: <a href="modules.html" title="previous chapter">&lt;no title&gt;</a></li>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>document.getElementById('searchbox').style.display = "block"</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2023, jlpl.
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 6.1.3</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.13</a>
+      
+      |
+      <a href="_sources/aerosol.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

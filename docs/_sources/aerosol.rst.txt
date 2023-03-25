@@ -1,0 +1,10 @@
+aerosol package
+===============
+
+aerosol.functions module
+------------------------
+
+.. automodule:: aerosol.functions
+   :members:
+   :undoc-members:
+   :show-inheritance:

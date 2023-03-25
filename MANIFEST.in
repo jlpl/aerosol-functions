@@ -1,3 +1,4 @@
 include *.in
 recursive-include docs *.html
 prune tests
+prune docs
