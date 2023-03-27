@@ -1,4 +1,4 @@
-include *.in
-recursive-include docs *.html
+recursive-include docs *
 prune tests
-prune docs
+prune docsrc
+

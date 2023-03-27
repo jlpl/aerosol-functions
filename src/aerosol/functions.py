@@ -1022,3 +1022,47 @@ def calc_ion_formation_rate(
     J_neg = pd.DataFrame(data=neg_formation_rate,columns=coags.columns,index=conc_neg.index)
 
     return J_neg, J_pos
+
+def tubeloss(diam, flowrate, tubelength, temp, pres):
+    """
+    Calculate diffusional particle losses to walls of
+    straight cylindrical tube assuming a laminar flow regime
+
+    Parameters
+    ----------
+    
+    diam : numpy.array (m,)
+        Particle diameters for which to calculate the
+        losses, unit: m
+    flowrate : numpy.array (n,)
+        unit: L/min
+    tubelength : float
+        Length of the cylindrical tube
+        unit: m
+    temp : numpy.array (n,)
+        temperature
+        unit: K
+    pres : numpy.array (n,)
+        air pressure
+        unit: Pa
+
+    Returns
+    -------
+
+    numpy.array (n,m)
+        Fraction of particles passing through.
+        Each column represents diameter and each
+        each row represents different temperature
+        pressure and flowrate value
+        
+    """
+    diameter_grid,temperature_grid = np.meshgrid(diam,temp)
+    diameter_grid,pressure_grid = np.meshgrid(diam,pres)
+    diameter_grid,sampleflow_grid = np.meshgrid(diam,flowrate)
+    rmuu = np.pi*particle_diffusivity(diameter_grid,temperature_grid,pressure_grid)*tubelength/sampleflow_grid
+    penetration = np.nan*np.ones(rmuu.shape)
+    condition1 = (rmuu<0.02)
+    condition2 = (rmuu>=0.02)
+    penetration[condition1] = 1. - 2.56*rmuu[condition1]**(2./3.) + 1.2*rmuu[condition1]+0.177*rmuu[condition1]**(4./3.)
+    penetration[condition2] = 0.819*np.exp(-3.657*rmuu[condition2]) + 0.097*np.exp(-22.3*rmuu[condition2]) + 0.032*np.exp(-57.0*rmuu[condition2])
+    return penetration

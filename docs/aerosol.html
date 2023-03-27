@@ -667,6 +667,42 @@ If False, use ticklabels only on outer subplots.</p>
 </dl>
 </dd></dl>
 
+<dl class="py function">
+<dt class="sig sig-object py" id="aerosol.functions.tubeloss">
+<span class="sig-prename descclassname"><span class="pre">aerosol.functions.</span></span><span class="sig-name descname"><span class="pre">tubeloss</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">diam</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">flowrate</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">tubelength</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">temp</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">pres</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#aerosol.functions.tubeloss" title="Permalink to this definition">¶</a></dt>
+<dd><p>Calculate diffusional particle losses to walls of
+straight cylindrical tube assuming a laminar flow regime</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><dl class="simple">
+<dt><strong>diam</strong><span class="classifier">numpy.array (m,)</span></dt><dd><p>Particle diameters for which to calculate the
+losses, unit: m</p>
+</dd>
+<dt><strong>flowrate</strong><span class="classifier">numpy.array (n,)</span></dt><dd><p>unit: L/min</p>
+</dd>
+<dt><strong>tubelength</strong><span class="classifier">float</span></dt><dd><p>Length of the cylindrical tube
+unit: m</p>
+</dd>
+<dt><strong>temp</strong><span class="classifier">numpy.array (n,)</span></dt><dd><p>temperature
+unit: K</p>
+</dd>
+<dt><strong>pres</strong><span class="classifier">numpy.array (n,)</span></dt><dd><p>air pressure
+unit: Pa</p>
+</dd>
+</dl>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><dl class="simple">
+<dt>numpy.array (n,m)</dt><dd><p>Fraction of particles passing through.
+Each column represents diameter and each
+each row represents different temperature
+pressure and flowrate value</p>
+</dd>
+</dl>
+</dd>
+</dl>
+</dd></dl>
+
 </section>
 </section>
 
@@ -716,6 +752,7 @@ If False, use ticklabels only on outer subplots.</p>
 <li class="toctree-l3"><a class="reference internal" href="#aerosol.functions.plot_aerosol_dist"><code class="docutils literal notranslate"><span class="pre">plot_aerosol_dist()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="#aerosol.functions.slipcorr"><code class="docutils literal notranslate"><span class="pre">slipcorr()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="#aerosol.functions.subplot_aerosol_dist"><code class="docutils literal notranslate"><span class="pre">subplot_aerosol_dist()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#aerosol.functions.tubeloss"><code class="docutils literal notranslate"><span class="pre">tubeloss()</span></code></a></li>
 </ul>
 </li>
 </ul>

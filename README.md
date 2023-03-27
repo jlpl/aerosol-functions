@@ -22,7 +22,7 @@ df.values:
     Normalized concentration dN/dlogDp in cm-3, float
 ```
 
-For example then one can calculate the number concentration in 3 different size ranges as
+One can for example calculate the number concentration in different size ranges
 
 ```python
 import aerosol.functions as af
