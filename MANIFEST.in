@@ -1,4 +1,0 @@
-recursive-include docs *
-prune tests
-prune docsrc
-

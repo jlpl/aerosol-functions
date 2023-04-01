@@ -3,14 +3,18 @@
    You can adapt this file completely to your liking, but it should at least
    contain the root `toctree` directive.
 
-Documentation
-=============
+Welcome to aerosol-functions' documentation!
+============================================
+
+Version: |version|
 
 .. toctree::
    :maxdepth: 4
    :caption: Contents:
 
    modules
+
+   plotting examples <plotting_tutorial.ipynb>
 
 ..
  Indices and tables

@@ -6,5 +6,9 @@ aerosol.functions module
 
 .. automodule:: aerosol.functions
    :members:
-   :undoc-members:
-   :show-inheritance:
+
+aerosol.plotting module
+------------------------
+
+.. automodule:: aerosol.plotting
+   :members:
