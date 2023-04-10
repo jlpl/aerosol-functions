@@ -611,7 +611,7 @@ def calc_conc(df,dmin,dmax):
             logdp=np.append(logdp,logdp_mid.max()+(logdp_mid.max()-logdp.max()))
             logdp=np.insert(logdp,0,logdp_mid.min()-(logdp.min()-logdp_mid.min()))
             dlogdp=np.diff(logdp)
-            conc=np.nansum(conc*dlogdp,axis=1)
+            conc = (conc*dlogdp).sum(axis=1, min_count=1)
 
         conc_df.insert(i,"%.2e_%.2e" % (dp1,dp2),conc)
 

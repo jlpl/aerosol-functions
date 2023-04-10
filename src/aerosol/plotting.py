@@ -87,7 +87,7 @@ def generate_log_ticks(min_exp,max_exp):
     """
 
     x=np.arange(1,10)
-    y=np.arange(min_exp,max_exp).astype(float)
+    y=np.arange(min_exp,max_exp+1).astype(float)
     log_minorticks=[]
     log_majorticks=[]
     log_majorticklabels=[]
@@ -112,8 +112,9 @@ def subplot_aerosol_dist(
     xticklabel_format="%H:%M",
     keep_inner_ticklabels=False,
     subplot_padding=None,
-    label_subplots=False,
-    label_color="white",
+    subplot_labels=None,
+    label_color="black",
+    label_size=10,
     column_titles=None):
     """ 
     Plot aerosol size distributions (subplots)
@@ -145,9 +146,10 @@ def subplot_aerosol_dist(
         If False, use ticklabels only on outer subplots.
     subplot_padding : number or None
         Adjust space between subplots
-    label_subplots : bool
-        Put labels on subplots
+    subplot_labels : list of str or None
+        The labels to put to labels the subplots with
     label_color : str
+    label_size :  float
     column_titles : list of strings or None
     
     Returns
@@ -157,9 +159,7 @@ def subplot_aerosol_dist(
     array of axes objects
      
     """
-    
-    labels = "abcdefghijklmnopqrstuvwxyzo"
-    
+     
     assert isinstance(vlist,list)
     
     rows = grid[0]
@@ -249,10 +249,10 @@ def subplot_aerosol_dist(
             axi.set_yticks([])
             axi.set_yticklabels([])
         
-        if label_subplots:
+        if subplot_labels is not None:
             if i<len(vlist):
-                axi.text(.01, .99, labels[i], ha='left', va='top', 
-                    color=label_color, transform=axi.transAxes)
+                axi.text(.01, .99, subplot_labels[i], ha='left', va='top', 
+                    color=label_color, transform=axi.transAxes, fontsize=label_size)
 
     if column_titles is not None:
         for column_title,axy in zip(column_titles,first_row_ax):
