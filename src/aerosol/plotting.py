@@ -99,6 +99,7 @@ def generate_log_ticks(min_exp,max_exp):
                 log_majorticks.append(np.log10(np.round(i*10**j,int(np.abs(j)))))
 
     log_minorticks=np.array(log_minorticks)
+    log_minorticks=log_minorticks[log_minorticks<=max_exp]
     log_majorticks=np.array(log_majorticks)
     return log_minorticks,log_majorticks,log_majorticklabels
 
