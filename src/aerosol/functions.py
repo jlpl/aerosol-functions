@@ -344,13 +344,16 @@ def calc_coags(df,dp,temp,pres):
 
     if isinstance(dp,float):
         dp = [dp]
+
+    temp = temp.values.reshape(-1,1)
+    pres = pres.values.reshape(-1,1)
     
     coags = pd.DataFrame(index = df.index)
     i=0
     for dpi in dp:
         df = df.loc[:,df.columns.values.astype(float)>=dpi]
         a = dndlogdp2dn(df)
-        b = 1e6*coagulation_coef(dpi,df.columns.values.astype(float),temp.values,pres.values)
+        b = 1e6*coagulation_coef(dpi,df.columns.values.astype(float),temp,pres)
         coags.insert(i,dpi,(a*b).sum(axis=1,min_count=1))
         i+=1
 
@@ -547,6 +550,9 @@ def calc_cs(df,temp,pres):
     else:
         pres = pres.reindex(df.index, method="nearest")
 
+    temp = temp.values.reshape(-1,1)
+    pres = pres.values.reshape(-1,1)
+
     M_h2so4 = 98.08   
     M_air = 28.965    
     V_air = 19.7      
@@ -556,15 +562,15 @@ def calc_cs(df,temp,pres):
 
     dp = df.columns.values.astype(float)
 
-    diffu = binary_diffusivity(temp.values,pres.values,M_h2so4,M_air,V_h2so4,V_air)
+    diffu = binary_diffusivity(temp,pres,M_h2so4,M_air,V_h2so4,V_air)
 
-    b = beta(dp,temp.values,pres.values,diffu,M_h2so4)
+    b = beta(dp,temp,pres,diffu,M_h2so4)
 
     df2 = (1e6*dn*(b*dp)).sum(axis=1,min_count=1)
 
-    cs = (4.*np.pi*diffu)*df2.values
+    cs = (4.*np.pi*diffu)*df2.values.reshape(-1,1)
 
-    return pd.Series(index=df.index,data=cs)
+    return pd.Series(index=df.index, data=cs.flatten())
 
 def calc_conc(df,dmin,dmax):
     """
@@ -661,16 +667,17 @@ def calc_formation_rate(
     coags = coags.reindex(conc.index,method="nearest")
 
     # Construct the dt frame
-    dt = conc.index.to_frame().diff().astype("timedelta64[s]").astype(float)
+    dt = conc.index.to_frame().diff().astype("timedelta64[s]").astype(float).values
+    dt[dt==0]=np.nan 
 
-    conc_term = conc.diff().values/dt.values
+    conc_term = conc.diff().values/dt
     sink_term = coags.values * conc.values
     gr_term = (2.778e-13*gr)/(dp2-dp1) * conc.values
     formation_rate = conc_term + sink_term + gr_term
     
     J = pd.DataFrame(data = formation_rate, index = conc.index, columns=coags.columns)
 
-    return J
+    return J,dt
 
 def calc_ion_formation_rate(
     dp1,
@@ -733,10 +740,11 @@ def calc_ion_formation_rate(
     Xi = 0.01e-6 # cm3 s-1
 
     # Construct the dt frame
-    dt = conc_neg.index.to_frame().diff().astype("timedelta64[s]").astype(float)
+    dt = conc_neg.index.to_frame().diff().astype("timedelta64[s]").astype(float).values
+    dt[dt==0] = np.nan
 
     # Calculate the terms
-    pos_conc_term = conc_pos.diff().values/dt.values
+    pos_conc_term = conc_pos.diff().values/dt
     pos_sink_term = coags.values * conc_pos.values
     pos_gr_term = (2.778e-13*gr)/(dp2-dp1) * conc_pos.values
     pos_recombination_term = alpha * conc_pos.values * conc_neg_small.values
@@ -745,7 +753,7 @@ def calc_ion_formation_rate(
 
     J_pos = pd.DataFrame(data=pos_formation_rate,columns=coags.columns,index=conc_neg.index)
 
-    neg_conc_term = conc_neg.diff().values/dt.values
+    neg_conc_term = conc_neg.diff().values/dt
     neg_sink_term = coags.values * conc_neg.values
     neg_gr_term = (2.778e-13*gr)/(dp2-dp1) * conc_neg.values
     neg_recombination_term = alpha * conc_neg.values * conc_pos_small.values
