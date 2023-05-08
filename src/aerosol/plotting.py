@@ -116,7 +116,9 @@ def subplot_aerosol_dist(
     subplot_labels=None,
     label_color="black",
     label_size=10,
-    column_titles=None):
+    column_titles=None,
+    fill_order="row",
+    **kwargs):
     """ 
     Plot aerosol size distributions (subplots)
 
@@ -152,7 +154,11 @@ def subplot_aerosol_dist(
     label_color : str
     label_size :  float
     column_titles : list of strings or None
-    
+    fill_order : str
+        `"rows"` fills the subplots row by row
+        `"columns"` fills the subplots column by column  
+    **kwargs : optional parameters passed to matplotlib imshow()
+
     Returns
     -------
     
@@ -169,33 +175,38 @@ def subplot_aerosol_dist(
     
     if subplot_padding is not None:
         fig.tight_layout(pad=subplot_padding)
-    
-    ax = ax.flatten()
-    
+   
+    ax_row = ax.flatten() # indices go row first
+    ax_col = ax.T.flatten() # indices go column first
+
     # Assert some limits regarding grid and plots
     if (rows==1) | (columns==1):
-        assert len(ax)==len(vlist)
+        assert len(ax_row)==len(vlist)
     else:
-        assert len(vlist)<=len(ax)
+        assert len(vlist)<=len(ax_row)
         assert len(vlist)>columns*(rows-1)
     
-    ax_last = ax[-1].get_position()
-    ax_first = ax[0].get_position()
+    ax_last = ax_row[-1].get_position()
+    ax_first = ax_row[0].get_position()
     origin = (ax_first.x0,ax_last.y0)
     size = (ax_last.x1-ax_first.x0,ax_first.y1-ax_last.y0)
     ax_width = ax_first.x1-ax_first.x0
     ax_height = ax_first.y1-ax_first.y0    
-    last_row_ax = ax[-1*columns:]
-    first_col_ax = ax[::columns]
-    first_row_ax = ax[:columns]
+    last_row_ax = ax_row[-1*columns:]
+    first_col_ax = ax_row[::columns]
+    first_row_ax = ax_row[:columns]
     
     log_minorticks,log_majorticks,log_majorticklabels = generate_log_ticks(-10,-4)
     
-    for i in np.arange(len(ax)):
+    for i in np.arange(len(ax_row)):
         
         if (i<len(vlist)):
             vi = vlist[i]
-            axi = ax[i]
+
+            if fill_order=="column":
+                axi = ax_col[i]
+            if fill_order=="row":
+                axi = ax_row[i]
             
             dndlogdp = vi.values.astype(float)
             tim=vi.index
@@ -210,11 +221,15 @@ def subplot_aerosol_dist(
                 aspect="auto",
                 cmap=cmap,
                 norm=norm,
-                extent=(t1,t2,dp1,dp2)
+                extent=(t1,t2,dp1,dp2),
+                **kwargs
             )
         else:
             vi = vlist[i-columns]
-            axi=ax[i]
+            if fill_order=="column":
+                axi = ax_col[i]
+            if fill_order=="row":
+                axi = ax_row[i]
             tim=vi.index
         
         time_minorticks,time_majorticks,time_ticklabels = generate_timeticks(
@@ -249,9 +264,14 @@ def subplot_aerosol_dist(
             axi.set_yticks([],minor=True)
             axi.set_yticks([])
             axi.set_yticklabels([])
-        
+
+    for i in np.arange(len(ax_row)):        
         if subplot_labels is not None:
             if i<len(vlist):
+                if fill_order=="column":
+                    axi = ax_col[i]
+                if fill_order=="row":
+                    axi = ax_row[i] 
                 axi.text(.01, .99, subplot_labels[i], ha='left', va='top', 
                     color=label_color, transform=axi.transAxes, fontsize=label_size)
 
@@ -267,7 +287,7 @@ def subplot_aerosol_dist(
     c_handle = plt.axes([origin[0] + size[0] + xspace, origin[1], 0.02, size[1]])
     cbar = plt.colorbar(img,cax=c_handle)
 
-    return fig,ax,cbar
+    return fig,ax_row,cbar
 
 def plot_aerosol_dist(
     v,
@@ -402,8 +422,8 @@ def stacked_plots(df,height_coef=3,spacing_coef=1.5,plot_type="plot",color=None,
             axi.set_yticklabels([])
             axy = axi.twinx()
             axy.spines[['top','left','bottom']].set_visible(False)
-            axy.set_xlim((x.min(),x.max()))
-            axy.set_ylim((y.min(),y.max()))
+            axy.set_xlim((np.nanmin(x),np.nanmax(x)))
+            axy.set_ylim((np.nanmin(y),np.nanmax(y)))
         elif (i==ax_idx[-1]):
             axi.spines[['right','top','left','bottom']].set_visible(False)
             axi.set_yticks([])
@@ -434,7 +454,7 @@ def stacked_plots(df,height_coef=3,spacing_coef=1.5,plot_type="plot",color=None,
             if color is not None:
                 axi.scatter(x,y[:,i],c=color,**kwargs)
             elif cmap is not None:
-                axi.scatter(x,y[:,i],c=y[:,i], cmap=cmap, norm=colors.Normalize(y.min(),y.max()),**kwargs)
+                axi.scatter(x,y[:,i],c=y[:,i], cmap=cmap, norm=colors.Normalize(np.nanmin(y),np.nanmax(y)),**kwargs)
             else:
                 axi.scatter(x,y[:,i],**kwargs)
                 
@@ -445,8 +465,8 @@ def stacked_plots(df,height_coef=3,spacing_coef=1.5,plot_type="plot",color=None,
                 axi.fill_between(x,y[:,i],color=cmap(float(i)/float(n)), **kwargs)
             else:
                 axi.fill_between(x,y[:,i], **kwargs)
-        
-        axi.set_xlim((x.min(),x.max()))
-        axi.set_ylim((y.min(),y.max()))
+
+        axi.set_xlim((np.nanmin(x),np.nanmax(x)))
+        axi.set_ylim((np.nanmin(y),np.nanmax(y)))
     
     return fig,ax[0],axy

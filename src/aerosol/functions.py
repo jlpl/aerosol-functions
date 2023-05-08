@@ -21,6 +21,8 @@ from matplotlib import colors
 from matplotlib.pyplot import cm
 from datetime import datetime, timedelta
 from scipy.optimize import minimize
+from scipy.interpolate import interp1d
+
 
 def datenum2datetime(datenum):
     """
@@ -623,6 +625,74 @@ def calc_conc(df,dmin,dmax):
 
     return conc_df
 
+def calc_conc_interp(df,dmin,dmax):
+    """
+    Calculate particle number concentration from aerosol 
+    number-size distribution using interpolation
+
+    Parameters
+    ----------
+
+    df : pandas.DataFrame
+        Aerosol number-size distribution
+    dmin : float or array
+        Size range lower diameter(s), unit: m
+    dmax : float or array
+        Size range upper diameter(s), unit: m
+
+    Returns
+    -------
+    
+    pandas.DataFrame
+        Number concentration in the given size range(s), unit: cm-3
+
+    """
+   
+    if isinstance(dmin,float):
+        dmin = [dmin]
+    if isinstance(dmax,float):
+        dmax = [dmax]
+
+    dp = df.columns.values.astype(float)
+    data = df.values
+
+    conc_df = pd.DataFrame(index = df.index)
+
+    for i in range(len(dmin)):
+        dp1 = dmin[i]
+        dp2 = dmax[i]
+
+        conc = np.nan*np.ones(df.shape[0]) 
+            
+        for j in range(df.shape[0]):
+
+            # Get data that is not NaNs 
+            x = dp[~np.isnan(data[j,:])]
+            y = data[j,~np.isnan(data[j,:])]
+
+            # If we have only one data point that is not NaN just bail out
+            if len(y)<2:
+                continue         
+
+            # Avoid bounds error
+            if dp2>x.max():
+                dp2 = x.max() 
+            if dp1<x.min():
+                dp1 = x.min()
+
+            # Create the dense grid
+            dp_grid = np.logspace(np.log10(dp1),np.log10(dp2),1000)
+            logdp_grid = np.log10(dp_grid)
+
+            # Calculate conc for this time point via interpolation
+            data_grid = interp1d(x,y)(dp_grid)
+            conc[j] = np.trapz(data_grid,x=logdp_grid)
+
+        conc_df.insert(i,"%.2e_%.2e" % (dmin[i],dmax[i]),conc)
+
+    return conc_df
+
+
 def calc_formation_rate(
     dp1,
     dp2,
@@ -797,6 +867,9 @@ def tubeloss(diam, flowrate, tubelength, temp, pres):
         pressure and flowrate value
         
     """
+     
+    # diameter_grid.shape = temperature_grid.shape = (len(temp), len(diam))
+
     diameter_grid,temperature_grid = np.meshgrid(diam,temp)
     diameter_grid,pressure_grid = np.meshgrid(diam,pres)
     diameter_grid,sampleflow_grid = np.meshgrid(diam,flowrate)

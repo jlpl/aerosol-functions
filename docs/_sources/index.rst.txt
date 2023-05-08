@@ -13,7 +13,7 @@ Version: |version|
    :caption: Contents:
 
    modules
-
+..
    plotting examples <plotting_tutorial.ipynb>
 
 ..

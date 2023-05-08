@@ -6,7 +6,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.18.1: http://docutils.sourceforge.net/" />
 
-    <title>aerosol package &#8212; aerosol-functions 0.0.10 documentation</title>
+    <title>aerosol package &#8212; aerosol-functions 0.0.11 documentation</title>
     <link rel="stylesheet" type="text/css" href="_static/pygments.css" />
     <link rel="stylesheet" type="text/css" href="_static/alabaster.css" />
     <script data-url_root="./" id="documentation_options" src="_static/documentation_options.js"></script>
@@ -15,7 +15,6 @@
     <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
-    <link rel="next" title="Plotting examples" href="plotting_tutorial.html" />
     <link rel="prev" title="&lt;no title&gt;" href="modules.html" />
    
   <link rel="stylesheet" href="_static/custom.css" type="text/css" />
@@ -177,6 +176,31 @@ unit: s-1</p>
 <span class="sig-prename descclassname"><span class="pre">aerosol.functions.</span></span><span class="sig-name descname"><span class="pre">calc_conc</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">df</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dmin</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dmax</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#aerosol.functions.calc_conc" title="Permalink to this definition">¶</a></dt>
 <dd><p>Calculate particle number concentration from aerosol 
 number-size distribution</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><dl class="simple">
+<dt><strong>df</strong><span class="classifier">pandas.DataFrame</span></dt><dd><p>Aerosol number-size distribution</p>
+</dd>
+<dt><strong>dmin</strong><span class="classifier">float or array</span></dt><dd><p>Size range lower diameter(s), unit: m</p>
+</dd>
+<dt><strong>dmax</strong><span class="classifier">float or array</span></dt><dd><p>Size range upper diameter(s), unit: m</p>
+</dd>
+</dl>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><dl class="simple">
+<dt>pandas.DataFrame</dt><dd><p>Number concentration in the given size range(s), unit: cm-3</p>
+</dd>
+</dl>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="aerosol.functions.calc_conc_interp">
+<span class="sig-prename descclassname"><span class="pre">aerosol.functions.</span></span><span class="sig-name descname"><span class="pre">calc_conc_interp</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">df</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dmin</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dmax</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#aerosol.functions.calc_conc_interp" title="Permalink to this definition">¶</a></dt>
+<dd><p>Calculate particle number concentration from aerosol 
+number-size distribution using interpolation</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><dl class="simple">
@@ -750,7 +774,7 @@ the matplotlib functions of the same name.</p>
 
 <dl class="py function">
 <dt class="sig sig-object py" id="aerosol.plotting.subplot_aerosol_dist">
-<span class="sig-prename descclassname"><span class="pre">aerosol.plotting.</span></span><span class="sig-name descname"><span class="pre">subplot_aerosol_dist</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">vlist</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">grid</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">cmap=&lt;matplotlib.colors.LinearSegmentedColormap</span> <span class="pre">object&gt;</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">norm=&lt;matplotlib.colors.Normalize</span> <span class="pre">object&gt;</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">xminortick_interval='1H'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">xmajortick_interval='2H'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">xticklabel_format='%H:%M'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">keep_inner_ticklabels=False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">subplot_padding=None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">subplot_labels=None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">label_color='black'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">label_size=10</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">column_titles=None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#aerosol.plotting.subplot_aerosol_dist" title="Permalink to this definition">¶</a></dt>
+<span class="sig-prename descclassname"><span class="pre">aerosol.plotting.</span></span><span class="sig-name descname"><span class="pre">subplot_aerosol_dist</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">vlist</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">grid</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">cmap=&lt;matplotlib.colors.LinearSegmentedColormap</span> <span class="pre">object&gt;</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">norm=&lt;matplotlib.colors.Normalize</span> <span class="pre">object&gt;</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">xminortick_interval='1H'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">xmajortick_interval='2H'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">xticklabel_format='%H:%M'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">keep_inner_ticklabels=False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">subplot_padding=None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">subplot_labels=None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">label_color='black'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">label_size=10</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">column_titles=None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">fill_order='row'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">**kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#aerosol.plotting.subplot_aerosol_dist" title="Permalink to this definition">¶</a></dt>
 <dd><p>Plot aerosol size distributions (subplots)</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
@@ -784,6 +808,10 @@ If False, use ticklabels only on outer subplots.</p>
 <dt><strong>label_color</strong><span class="classifier">str</span></dt><dd></dd>
 <dt><strong>label_size</strong><span class="classifier">float</span></dt><dd></dd>
 <dt><strong>column_titles</strong><span class="classifier">list of strings or None</span></dt><dd></dd>
+<dt><strong>fill_order</strong><span class="classifier">str</span></dt><dd><p><cite>“rows”</cite> fills the subplots row by row
+<cite>“columns”</cite> fills the subplots column by column</p>
+</dd>
+<dt><strong>**kwargs</strong><span class="classifier">optional parameters passed to matplotlib imshow()</span></dt><dd></dd>
 </dl>
 </dd>
 <dt class="field-even">Returns<span class="colon">:</span></dt>
@@ -827,6 +855,7 @@ If False, use ticklabels only on outer subplots.</p>
 <li class="toctree-l3"><a class="reference internal" href="#aerosol.functions.binary_diffusivity"><code class="docutils literal notranslate"><span class="pre">binary_diffusivity()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="#aerosol.functions.calc_coags"><code class="docutils literal notranslate"><span class="pre">calc_coags()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="#aerosol.functions.calc_conc"><code class="docutils literal notranslate"><span class="pre">calc_conc()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#aerosol.functions.calc_conc_interp"><code class="docutils literal notranslate"><span class="pre">calc_conc_interp()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="#aerosol.functions.calc_cs"><code class="docutils literal notranslate"><span class="pre">calc_cs()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="#aerosol.functions.calc_formation_rate"><code class="docutils literal notranslate"><span class="pre">calc_formation_rate()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="#aerosol.functions.calc_ion_formation_rate"><code class="docutils literal notranslate"><span class="pre">calc_ion_formation_rate()</span></code></a></li>
@@ -855,7 +884,6 @@ If False, use ticklabels only on outer subplots.</p>
 </li>
 </ul>
 </li>
-<li class="toctree-l1"><a class="reference internal" href="plotting_tutorial.html">plotting examples</a></li>
 </ul>
 
 <div class="relations">
@@ -864,7 +892,6 @@ If False, use ticklabels only on outer subplots.</p>
   <li><a href="index.html">Documentation overview</a><ul>
   <li><a href="modules.html">&lt;no title&gt;</a><ul>
       <li>Previous: <a href="modules.html" title="previous chapter">&lt;no title&gt;</a></li>
-      <li>Next: <a href="plotting_tutorial.html" title="next chapter">Plotting examples</a></li>
   </ul></li>
   </ul></li>
 </ul>
