@@ -70,6 +70,32 @@ def datetime2datenum(dt):
     frac = (dt-datetime(dt.year,dt.month,dt.day,0,0,0)).seconds / (24.0 * 60.0 * 60.0)
     return mdn.toordinal() + frac
 
+
+def calc_bin_edges(dp):
+    """
+    Calculate bin edges for log-spaced bin centers
+    
+    Parameters
+    ----------
+    
+    dp : numpy.array (n,)
+        bin center diameters
+
+    Returns
+    -------
+
+    numpy.array (n+1,)
+        log bin edges
+
+    """
+
+    logdp_mid = np.log10(dp)
+    logdp = (logdp_mid[:-1]+logdp_mid[1:])/2.0
+    logdp = np.append(logdp,logdp_mid.max()+(logdp_mid.max()-logdp.max()))
+    logdp = np.insert(logdp,0,logdp_mid.min()-(logdp.min()-logdp_mid.min()))
+    
+    return logdp
+
 def dndlogdp2dn(df):
     """    
     Convert from normalized number concentrations to
@@ -89,10 +115,8 @@ def dndlogdp2dn(df):
 
     """
     
-    logdp_mid = np.log10(df.columns.values.astype(float))
-    logdp = (logdp_mid[:-1]+logdp_mid[1:])/2.0
-    logdp = np.append(logdp,logdp_mid.max()+(logdp_mid.max()-logdp.max()))
-    logdp = np.insert(logdp,0,logdp_mid.min()-(logdp.min()-logdp_mid.min()))
+    dp = df.columns.values.astype(float)
+    logdp = calc_bin_edges(dp)
     dlogdp = np.diff(logdp)
 
     return df*dlogdp
@@ -304,7 +328,7 @@ def coagulation_coef(dp1,dp2,temp,pres):
            * ( (dp1+dp2)/(dp1+dp2+2.*(g1**2.+g2**2.)**0.5) + \
            +   (8.*(D1+D2))/((c1**2.+c2**2.)**0.5*(dp1+dp2)) )
 
-def calc_coags(df,dp,temp,pres):
+def calc_coags(df,dp,temp,pres,dp_start=None):
     """ 
     Calculate coagulation sink
 
@@ -324,6 +348,9 @@ def calc_coags(df,dp,temp,pres):
     pres : pandas.Series or float
         Ambient pressure corresponding to the data, unit: Pa
         If single value given it is used for all data
+    dp_start : float, None 
+        The smallest size that you consider as part of the coagulation sink
+        If None (default) then the smallest size is from dp
 
     Returns
     -------
@@ -353,7 +380,12 @@ def calc_coags(df,dp,temp,pres):
     coags = pd.DataFrame(index = df.index)
     i=0
     for dpi in dp:
-        df = df.loc[:,df.columns.values.astype(float)>=dpi]
+        if dp_start is None:
+            df = df.loc[:,df.columns.values.astype(float)>=dpi]
+        elif dp_start<=dpi:
+            df = df.loc[:,df.columns.values.astype(float)>=dpi]
+        else:
+            df = df.loc[:,df.columns.values.astype(float)>=dp_start]
         a = dndlogdp2dn(df)
         b = 1e6*coagulation_coef(dpi,df.columns.values.astype(float),temp,pres)
         coags.insert(i,dpi,(a*b).sum(axis=1,min_count=1))
@@ -614,91 +646,21 @@ def calc_conc(df,dmin,dmax):
         else:
             dp_subset=dp[findex]
             conc=df.iloc[:,findex]
-            logdp_mid=np.log10(dp_subset)
-            logdp=(logdp_mid[:-1]+logdp_mid[1:])/2.0
-            logdp=np.append(logdp,logdp_mid.max()+(logdp_mid.max()-logdp.max()))
-            logdp=np.insert(logdp,0,logdp_mid.min()-(logdp.min()-logdp_mid.min()))
-            dlogdp=np.diff(logdp)
+            logdp = calc_bin_edges(dp_subset)
+            dlogdp = np.diff(logdp)
             conc = (conc*dlogdp).sum(axis=1, min_count=1)
 
-        conc_df.insert(i,"%.2e_%.2e" % (dp1,dp2),conc)
+        conc_df.insert(i,"N_%d" % i,conc)
 
     return conc_df
-
-def calc_conc_interp(df,dmin,dmax):
-    """
-    Calculate particle number concentration from aerosol 
-    number-size distribution using interpolation
-
-    Parameters
-    ----------
-
-    df : pandas.DataFrame
-        Aerosol number-size distribution
-    dmin : float or array
-        Size range lower diameter(s), unit: m
-    dmax : float or array
-        Size range upper diameter(s), unit: m
-
-    Returns
-    -------
-    
-    pandas.DataFrame
-        Number concentration in the given size range(s), unit: cm-3
-
-    """
-   
-    if isinstance(dmin,float):
-        dmin = [dmin]
-    if isinstance(dmax,float):
-        dmax = [dmax]
-
-    dp = df.columns.values.astype(float)
-    data = df.values
-
-    conc_df = pd.DataFrame(index = df.index)
-
-    for i in range(len(dmin)):
-        dp1 = dmin[i]
-        dp2 = dmax[i]
-
-        conc = np.nan*np.ones(df.shape[0]) 
-            
-        for j in range(df.shape[0]):
-
-            # Get data that is not NaNs 
-            x = dp[~np.isnan(data[j,:])]
-            y = data[j,~np.isnan(data[j,:])]
-
-            # If we have only one data point that is not NaN just bail out
-            if len(y)<2:
-                continue         
-
-            # Avoid bounds error
-            if dp2>x.max():
-                dp2 = x.max() 
-            if dp1<x.min():
-                dp1 = x.min()
-
-            # Create the dense grid
-            dp_grid = np.logspace(np.log10(dp1),np.log10(dp2),1000)
-            logdp_grid = np.log10(dp_grid)
-
-            # Calculate conc for this time point via interpolation
-            data_grid = interp1d(x,y)(dp_grid)
-            conc[j] = np.trapz(data_grid,x=logdp_grid)
-
-        conc_df.insert(i,"%.2e_%.2e" % (dmin[i],dmax[i]),conc)
-
-    return conc_df
-
 
 def calc_formation_rate(
+    df,
     dp1,
     dp2,
-    conc,
-    coags,
-    gr):
+    gr,
+    temp,
+    pres):
     """
     Calculate particle formation rate
     
@@ -707,58 +669,70 @@ def calc_formation_rate(
     Parameters
     ----------
     
+    df : pd.DataFrame
+        Aerosol particle number size distribution
     dp1 : float or array
         Lower diameter of the size range(s), unit: m
     dp2 : float or array
         Upper diameter of the size range(s), unit m
-    conc : pandas.DataFrame
-        particle number concentration timeseries
-        in the size range(s), unit cm-3
-    coags : pandas.DataFrame
-        Coagulation sink timeseries for particles 
-        in the size range(s). unit s-1 
-
-        Usually approximated as coagulation sink for particle size
-        in the lower limit of the size range, 
-        unit s-1
     gr : float or array
         Growth rate for particles out of the size range(s), 
         unit nm h-1
+    temp : pandas.Series or float
+        Ambient temperature corresponding to the data, unit: K
+        If single value given it is used for all data
+    pres : pandas.Series or float
+        Ambient pressure corresponding to the data, unit: Pa
+        If single value given it is used for all data
 
     Returns
     -------
 
     pandas.DataFrame
-        particle formation rate for diameter(s), unit: cm3 s-1
+        particle formation rate(s) for the diameter range(s), unit: cm3 s-1
 
     """
-
-    # Fit the coags to the conc index
-    coags = coags.reindex(conc.index,method="nearest")
-
-    # Construct the dt frame
-    dt = conc.index.to_frame().diff().astype("timedelta64[s]").astype(float).values
-    dt[dt==0]=np.nan 
-
-    conc_term = conc.diff().values/dt
-    sink_term = coags.values * conc.values
-    gr_term = (2.778e-13*gr)/(dp2-dp1) * conc.values
-    formation_rate = conc_term + sink_term + gr_term
     
-    J = pd.DataFrame(data = formation_rate, index = conc.index, columns=coags.columns)
+    dn = dndlogdp2dn(df)
 
-    return J,dt
+    dp = df.columns.values.astype(float)
+
+    J = pd.DataFrame(index = df.index)
+
+    for i in range(len(dp1)):
+        idx = np.argwhere((dp>=dp1[i]) & (dp<=dp2[i])).flatten()
+
+        # Sink term (consider all sizes inside the range) 
+        sink_term = np.zeros(len(df.index))
+        for j in idx:
+            sink_term = sink_term + calc_coags(df,dp[j],temp,pres).values.flatten() * dn.iloc[:,j].values.flatten()
+    
+        # Conc term (observed change in the size range number concentration)
+        dt = df.index.to_frame().diff().astype("timedelta64[s]").astype(float).values.flatten()
+        dt[dt==0] = np.nan    
+        conc = calc_conc(df,dp1[i],dp2[i])
+        conc_term = conc.diff().values.flatten()/dt
+    
+        # GR term (consider the largest size in our size range)
+        # GR is usually calculated for the size range 
+        gr_term = (2.778e-13*gr[i])/(dp2[i]-dp1[i]) * dn.iloc[:,int(np.max(idx))].values.flatten()
+        
+        formation_rate = conc_term + sink_term + gr_term
+
+        J.insert(i, "J_%d" % i, formation_rate)
+
+    return J
 
 def calc_ion_formation_rate(
+    df_particles,
+    df_negions,
+    df_posions,
     dp1,
     dp2,
-    conc_pos,
-    conc_neg,
-    conc_pos_small,
-    conc_neg_small,
-    conc,
-    coags,
-    gr):
+    gr_negions,
+    gr_posions,
+    temp,
+    pres):
     """ 
     Calculate ion formation rate
     
@@ -767,26 +741,26 @@ def calc_ion_formation_rate(
     Parameters
     ----------
 
+    df_particles : pandas.DataFrame
+         Aerosol particle number size distribution   
+    df_negions : 
+        Negative ion number size distribution
+    df_posions : 
+        Positive ion number size distribution
     dp1 : float or numpy.array
         Lower diameter of the size range(s), unit: m
     dp2 : float or numpy.array
         Upper diameter of the size range(s), unit: m
-    conc_pos : pandas.DataFrame
-        Positive ion number concentration in the size range(s), unit: cm-3. 
-        Each size range corresponds to a column in the dataframe
-    conc_neg : pandas.DataFrame
-        Negative ion number concentration in the size range(s), unit: cm-3
-    conc_pos_small : pandas.DataFrame
-        Positive ion number concentration for ions smaller than size range(s), unit: cm-3
-    conc_neg_small : pandas.DataFrame
-        Negative ion number concentration for ions smaller than size range(s), unit: cm-3
-    conc : pandas.DataFrame
-        Particle number concentration in the size range(s), unit: cm-3
-    coags : pandas.DataFrame
-        Coagulation sink for particles in the size range(s).
-        unit: s-1
-    gr : float or numpy.array
-        Growth rate for particles out of the size range(s), unit: nm h-1
+    gr_negions : float or numpy.array
+        Growth rate for negative ions out of the size range(s), unit: nm h-1
+    gr_posions : float or numpy.array
+        Growth rate for positive ions out of the size range(s), unit: nm h-1
+    temp : pandas.Series or float
+        Ambient temperature corresponding to the data, unit: K
+        If single value given it is used for all data
+    pres : pandas.Series or float
+        Ambient pressure corresponding to the data, unit: Pa
+        If single value given it is used for all data
 
     Returns
     -------
@@ -798,41 +772,63 @@ def calc_ion_formation_rate(
 
     """
 
-    # Reindex everything to conc_neg
-    coags = coags.reindex(conc_neg.index,method="nearest")
-    conc_pos = conc_pos.reindex(conc_neg.index,method="nearest")
-    conc = conc.reindex(conc_neg.index,method="nearest")
-    conc_neg_small = conc_neg_small.reindex(conc_neg.index,method="nearest")
-    conc_pos_small = conc_pos_small.reindex(conc_neg.index,method="nearest")
+    dn_particles = dndlogdp2dn(df_particles)
+    dn_negions = dndlogdp2dn(df_negions)
+    dn_posions = dndlogdp2dn(df_posions)
+
+    dp = df_negions.columns.values.astype(float)
+    time = df_negions.index
+
+    J_negions = pd.DataFrame(index = df_negions.index)
+    J_posions = pd.DataFrame(index = df_posions.index)
 
     # Constants
     alpha = 1.6e-6 # cm3 s-1
     Xi = 0.01e-6 # cm3 s-1
 
-    # Construct the dt frame
-    dt = conc_neg.index.to_frame().diff().astype("timedelta64[s]").astype(float).values
-    dt[dt==0] = np.nan
+    for i in range(len(dp1)):
+        idx = np.argwhere((dp>=dp1[i]) & (dp<=dp2[i])).flatten()
 
-    # Calculate the terms
-    pos_conc_term = conc_pos.diff().values/dt
-    pos_sink_term = coags.values * conc_pos.values
-    pos_gr_term = (2.778e-13*gr)/(dp2-dp1) * conc_pos.values
-    pos_recombination_term = alpha * conc_pos.values * conc_neg_small.values
-    pos_charging_term = Xi * conc.values * conc_pos_small.values
-    pos_formation_rate = pos_conc_term + pos_sink_term + pos_gr_term + pos_recombination_term - pos_charging_term
+        # Sink terms
+        sink_term_negions = np.zeros(len(time))
+        sink_term_posions = np.zeros(len(time))
+        for j in idx:
+            sink_term_negions = sink_term_negions + calc_coags(df_particles,dp[j],temp,pres).values.flatten() * dn_negions.iloc[:,j].values.flatten()
+            sink_term_posions = sink_term_posions + calc_coags(df_particles,dp[j],temp,pres).values.flatten() * dn_posions.iloc[:,j].values.flatten()
 
-    J_pos = pd.DataFrame(data=pos_formation_rate,columns=coags.columns,index=conc_neg.index)
+        # Conc terms
+        dt = time.to_frame().diff().astype("timedelta64[s]").astype(float).values.flatten()
+        dt[dt==0] = np.nan
 
-    neg_conc_term = conc_neg.diff().values/dt
-    neg_sink_term = coags.values * conc_neg.values
-    neg_gr_term = (2.778e-13*gr)/(dp2-dp1) * conc_neg.values
-    neg_recombination_term = alpha * conc_neg.values * conc_pos_small.values
-    neg_charging_term = Xi * conc.values * conc_neg_small.values
-    neg_formation_rate = neg_conc_term + neg_sink_term + neg_gr_term + neg_recombination_term - neg_charging_term
+        conc_negions = calc_conc(df_negions,dp1[i],dp2[i])
+        conc_term_negions = conc_negions.diff().values.flatten()/dt
 
-    J_neg = pd.DataFrame(data=neg_formation_rate,columns=coags.columns,index=conc_neg.index)
+        conc_posions = calc_conc(df_posions,dp1[i],dp2[i])
+        conc_term_posions = conc_posions.diff().values.flatten()/dt
+ 
+        # GR terms
+        gr_term_negions = (2.778e-13*gr_negions[i])/(dp2[i]-dp1[i]) * dn_negions.iloc[:,int(np.max(idx))].values.flatten()
+        gr_term_posions = (2.778e-13*gr_posions[i])/(dp2[i]-dp1[i]) * dn_posions.iloc[:,int(np.max(idx))].values.flatten()
 
-    return J_neg, J_pos
+        # Recombination terms
+        conc_small_negions = calc_conc(df_negions,0.5e-9,dp1[i])
+        conc_small_posions = calc_conc(df_posions,0.5e-9,dp1[i])
+
+        recombi_term_negions = alpha * conc_posions.values.flatten() * conc_small_negions.values.flatten()
+        recombi_term_posions = alpha * conc_negions.values.flatten() * conc_small_posions.values.flatten()
+
+        # Charging terms
+        conc_particles = calc_conc(df_particles,dp1[i],dp2[i])
+        charging_term_negions = Xi * conc_particles.values.flatten() * conc_small_negions.values.flatten()
+        charging_term_posions = Xi * conc_particles.values.flatten() * conc_small_posions.values.flatten()
+
+        formation_rate_negions = conc_term_negions + sink_term_negions + gr_term_negions + recombi_term_negions - charging_term_negions
+        formation_rate_posions = conc_term_posions + sink_term_posions + gr_term_posions + recombi_term_posions - charging_term_posions
+
+        J_negions.insert(i, "J_%d" % i, formation_rate_negions)
+        J_posions.insert(i, "J_%d" % i, formation_rate_posions)
+
+    return J_negions, J_posions
 
 def tubeloss(diam, flowrate, tubelength, temp, pres):
     """
@@ -867,8 +863,6 @@ def tubeloss(diam, flowrate, tubelength, temp, pres):
         pressure and flowrate value
         
     """
-     
-    # diameter_grid.shape = temperature_grid.shape = (len(temp), len(diam))
 
     diameter_grid,temperature_grid = np.meshgrid(diam,temp)
     diameter_grid,pressure_grid = np.meshgrid(diam,pres)
@@ -879,4 +873,150 @@ def tubeloss(diam, flowrate, tubelength, temp, pres):
     condition2 = (rmuu>=0.02)
     penetration[condition1] = 1. - 2.56*rmuu[condition1]**(2./3.) + 1.2*rmuu[condition1]+0.177*rmuu[condition1]**(4./3.)
     penetration[condition2] = 0.819*np.exp(-3.657*rmuu[condition2]) + 0.097*np.exp(-22.3*rmuu[condition2]) + 0.032*np.exp(-57.0*rmuu[condition2])
+
     return penetration
+
+def surf_dist(df):
+    """
+    Calculate the aerosol surface area size distribution
+
+    Parameters
+    ----------
+
+    df : pd.DataFrame
+        Aerosol number-size distribution
+
+    Returns
+    -------
+        
+    pd.DataFrame
+        Aerosol surface area-size distribution
+        unit: m2 cm-3
+
+    """
+
+    dp = df.columns.values.astype(float).flatten()
+
+    return (np.pi*dp**2)*df
+
+    
+def vol_dist(df):
+    """
+    Calculate the aerosol volume size distribution
+
+    Parameters
+    ----------
+
+    df : pd.DataFrame
+        Aerosol number-size distribution
+
+    Returns
+    -------
+        
+    pd.DataFrame
+        Aerosol volume-size distribution
+        unit: m3 cm-3
+
+    """
+    dp = df.columns.values.astype(float).flatten()
+
+    return (np.pi*(1./6.)*dp**3)*df
+
+def calc_lung_df(dp):
+    """
+    Calculate lung deposition fractions for particle diameters
+
+    ICRP, 1994. Human respiratory tract model for 
+    radiological protection. A report of a task 
+    group of the international commission on 
+    radiological protection. Ann. ICRP 24 (1-3), 1-482
+
+    Parameters
+    ----------
+
+    dp : array
+        aerosol particle diameters
+        unit: m
+
+    Returns
+    -------
+
+    pandas.DataFrame
+        Lung deposition fractions for alveoli ("DF_al"), trachea/bronchi ("DF_tb")
+        head-airways ("DF_ha") and all combiend ("DF_tot")
+
+    """
+
+    # convert from meters to micrometers
+    dp = dp*1e6
+
+    # Deposition fractions
+    IF = 1-0.5*(1.-1./(1.+0.00076*dp**2.8))
+    DF_ha = IF*(1./(1.+np.exp(6.84+1.183*np.log(dp)))+1./(1.+np.exp(0.924-1.885*np.log(dp))))
+    DF_al = (0.0155/dp)*(np.exp(-0.416*(np.log(dp)+2.84)**2) + 19.11*np.exp(-0.482*(np.log(dp)-1.362)**2))
+    DF_tb = (0.00352/dp)*(np.exp(-0.234*(np.log(dp)+3.4)**2) + 63.9*np.exp(-0.819*(np.log(dp)-1.61)**2))
+    DF_tot = IF*(0.0587 + 0.911/(1.+np.exp(4.77+1.485*np.log(dp)))+0.943/(1.+np.exp(0.508-2.58*np.log(dp)))) 
+
+    DFs = pd.DataFrame({
+        "DF_al":DF_al,
+        "DF_tb":DF_tb,
+        "DF_ha":DF_ha,
+        "DF_tot":DF_tot
+        })
+
+    return DFs 
+
+
+def calc_ldsa(df):
+    """
+    Calculate total LDSA from number size distribution data
+
+    ICRP, 1994. Human respiratory tract model for 
+    radiological protection. A report of a task 
+    group of the international commission on 
+    radiological protection. Ann. ICRP 24 (1-3), 1-482
+
+    Parameters
+    ----------
+    
+    df : pandas.DataFrame
+        Aerosol number-size distribution
+
+    Returns
+    -------
+    
+    pandas.DataFrame
+        Total LDSA for alveoli ("al"), trachea/bronchi ("tb")
+        head-airways ("ha") and all combiend ("tot")
+        unit: um2 cm-3
+    
+    """
+    
+    # m -> um
+    dp = df.columns.values.astype(float)*1e6
+
+    logdp = calc_bin_edges(dp)
+    dlogdp = np.diff(logdp)
+
+    # m2/cm-3 -> um2/cm-3
+    surface_dist = surf_dist(df)*1e12
+
+    # input needs ot be in m
+    depo_fracs = calc_lung_df(dp*1e-6)
+
+    ldsa_dist_al = surface_dist * depo_fracs.iloc[:,0].values.flatten()
+    ldsa_dist_tb = surface_dist * depo_fracs.iloc[:,1].values.flatten()
+    ldsa_dist_ha = surface_dist * depo_fracs.iloc[:,2].values.flatten()
+    ldsa_dist_tot = surface_dist * depo_fracs.iloc[:,3].values.flatten()
+
+    ldsa_dist = [ldsa_dist_al,ldsa_dist_tb,ldsa_dist_ha,ldsa_dist_tot]
+
+    ldsa_column_names = ["LDSA_al","LDSA_tb","LDSA_ha","LDSA_tot"]
+
+    df_ldsa = pd.DataFrame(index = df.index, columns = ldsa_column_names)
+
+    for i in range(len(ldsa_dist)):
+        ldsa = (ldsa_dist[i]*dlogdp).sum(axis=1,min_count=1)    
+        df_ldsa[ldsa_column_names[i]] = ldsa
+
+    return df_ldsa

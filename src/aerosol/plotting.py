@@ -14,7 +14,7 @@ def rotate_xticks(ax,degrees):
     
     ax : matplotlib axes
     degrees : int or float
-       number of degrees to rotate the ticklabels
+       number of degrees to rotate the xticklabels
     
     """
     for tick in ax.get_xticklabels():
@@ -112,7 +112,8 @@ def subplot_aerosol_dist(
     xmajortick_interval="2H",
     xticklabel_format="%H:%M",
     keep_inner_ticklabels=False,
-    subplot_padding=None,
+    hspace_padding=None,
+    vspace_padding=None,
     subplot_labels=None,
     label_color="black",
     label_size=10,
@@ -164,6 +165,7 @@ def subplot_aerosol_dist(
     
     figure object
     array of axes objects
+    colorbar handle
      
     """
      
@@ -173,9 +175,10 @@ def subplot_aerosol_dist(
     columns = grid[1]
     fig,ax = plt.subplots(rows,columns)
     
-    if subplot_padding is not None:
-        fig.tight_layout(pad=subplot_padding)
-   
+    if hspace_padding is not None:
+        fig.subplots_adjust(hspace=hspace_padding)
+        #fig.tight_layout(pad=subplot_padding)
+
     ax_row = ax.flatten() # indices go row first
     ax_col = ax.T.flatten() # indices go column first
 
@@ -260,10 +263,9 @@ def subplot_aerosol_dist(
             rotate_xticks(axi,45)
             
         if i>=len(vlist):
-            axi.spines[['right','top','left','bottom']].set_visible(False)
-            axi.set_yticks([],minor=True)
-            axi.set_yticks([])
-            axi.set_yticklabels([])
+            axi.axis("off")
+            ax_row[i-columns].set_xticklabels(time_ticklabels)
+            rotate_xticks(ax_row[i-columns],45)
 
     for i in np.arange(len(ax_row)):        
         if subplot_labels is not None:
@@ -320,6 +322,11 @@ def plot_aerosol_dist(
         See for all options here: 
         https://docs.python.org/3/library/datetime.html#strftime-and-strptime-format-code
      
+    Returns
+    -------
+
+    colorbar handle
+     
     """
     handle = ax
     box = handle.get_position()
@@ -358,115 +365,9 @@ def plot_aerosol_dist(
 
     handle.set_ylim((dp1,dp2))
     handle.set_xlim((t1,t2))
-        
-    rotate_xticks(handle,45)
 
     c_handle = plt.axes([origin[0]*1.03 + size[0]*1.03, origin[1], 0.02, size[1]])
     cbar = plt.colorbar(img,cax=c_handle)
     cbar.set_label('$dN/dlogD_p$, [cm$^{-3}$]')
-    
 
-
-def stacked_plots(df,height_coef=3,spacing_coef=1.5,plot_type="plot",color=None,cmap=None,**kwargs):
-    """
-    Vertically stacked overlapping plots
-    
-    Parameters
-    ----------
-    df : pandas.DataFrame
-        first column is plotted to lower/foremost plot
-    height_coef : int or float
-        scales the height of the subplots
-    spacing_coef : int or float
-        scales the vertical spacing between subplots
-    plot_type : str
-        "scatter", "plot" or "fill_between" corresponding to
-        the matplotlib functions of the same name.
-    color : matplotlib color
-    cmap : matplotlib colormap
-        can apply to any plot_type
-    **kwargs : optional properties passed on to the plot_type
-        
-    Returns
-    -------
-    matplotlib figure
-    matplotlib axes
-        lowest subplot x-axes
-    matplotlib axes
-        lowest subplot y-axes
-    """
-    fig = plt.figure()
-    n = df.shape[1]
-    
-    h = 1.0/n
-    ax = []
-    
-    ylabels = df.columns
-    y = df.values
-    x = df.index.values
-    
-    # lowest plot is the foremost
-    n_idx = np.flip(np.arange(n))
-
-    for i in n_idx:
-        rect = [0,i*h*spacing_coef,1,h*height_coef]
-        ax.append(fig.add_axes(rect))
-    
-    ax = np.flip(np.array(ax))
-    ax_idx = np.arange(len(ax))
-    
-    for i,axi in zip(ax_idx,ax):
-        if i==0:
-            axi.spines[['top','left','right']].set_visible(False)
-            axi.set_yticks([])
-            axi.set_yticklabels([])
-            axy = axi.twinx()
-            axy.spines[['top','left','bottom']].set_visible(False)
-            axy.set_xlim((np.nanmin(x),np.nanmax(x)))
-            axy.set_ylim((np.nanmin(y),np.nanmax(y)))
-        elif (i==ax_idx[-1]):
-            axi.spines[['right','top','left','bottom']].set_visible(False)
-            axi.set_yticks([])
-            axi.set_yticklabels([])
-            axi.set_xticks([])
-            axi.set_xticklabels([])
-        else:
-            axi.spines[['right','top','left','bottom']].set_visible(False)
-            axi.set_yticks([])
-            axi.set_yticklabels([])
-            axi.set_xticks([])
-            axi.set_xticklabels([])
-        
-        axi.set_ylabel(ylabels[i], rotation=0, y=0, rotation_mode="anchor",
-            verticalalignment='bottom',horizontalalignment="right")
-        
-        axi.patch.set_alpha(0.0)
-        
-        if plot_type == "plot":
-            if color is not None:
-                axi.plot(x,y[:,i],c=color, **kwargs)
-            elif cmap is not None:
-                axi.plot(x,y[:,i],c=cmap(float(i)/float(n)), **kwargs)
-            else:
-                axi.plot(x,y[:,i], **kwargs)
-                
-        if plot_type == "scatter":
-            if color is not None:
-                axi.scatter(x,y[:,i],c=color,**kwargs)
-            elif cmap is not None:
-                axi.scatter(x,y[:,i],c=y[:,i], cmap=cmap, norm=colors.Normalize(np.nanmin(y),np.nanmax(y)),**kwargs)
-            else:
-                axi.scatter(x,y[:,i],**kwargs)
-                
-        if plot_type=="fill_between":
-            if color is not None:
-                axi.fill_between(x,y[:,i],color=color, **kwargs)
-            elif cmap is not None:
-                axi.fill_between(x,y[:,i],color=cmap(float(i)/float(n)), **kwargs)
-            else:
-                axi.fill_between(x,y[:,i], **kwargs)
-
-        axi.set_xlim((np.nanmin(x),np.nanmax(x)))
-        axi.set_ylim((np.nanmin(y),np.nanmax(y)))
-    
-    return fig,ax[0],axy
+    return cbar
