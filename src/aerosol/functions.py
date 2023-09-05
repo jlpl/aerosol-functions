@@ -883,13 +883,13 @@ def surf_dist(df):
     Parameters
     ----------
 
-    df : pd.DataFrame
+    df : pandas.DataFrame
         Aerosol number-size distribution
 
     Returns
     -------
         
-    pd.DataFrame
+    pandas.DataFrame
         Aerosol surface area-size distribution
         unit: m2 cm-3
 
@@ -907,13 +907,13 @@ def vol_dist(df):
     Parameters
     ----------
 
-    df : pd.DataFrame
+    df : pandas.DataFrame
         Aerosol number-size distribution
 
     Returns
     -------
         
-    pd.DataFrame
+    pandas.DataFrame
         Aerosol volume-size distribution
         unit: m3 cm-3
 

@@ -1,6 +1,4 @@
-![logo](logo.png)
-
----
+![logo](https://github.com/jlpl/aerosol-functions/raw/master/logo.png)
 
 A collection of tools to analyze and visualize atmospheric aerosol data.
 
