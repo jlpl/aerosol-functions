@@ -23,6 +23,25 @@ from datetime import datetime, timedelta
 from scipy.optimize import minimize
 from scipy.interpolate import interp1d
 
+def air_density(temp,pres):
+    """
+    Calculate air density
+
+    Parameters
+    ----------
+
+    temp : float or array   
+        absolute temperature (K) 
+    pres : float or array
+        absolute pressure (Pa)
+ 
+    Returns
+    -------
+
+    float or array
+        air density (kg/m3)
+    """
+    return pres/(287.0500676*temp)
 
 def datenum2datetime(datenum):
     """
@@ -190,12 +209,18 @@ def slipcorr(dp,temp,pres):
         Cunningham slip correction factor for each particle diameter,
         if temperature and pressure and arrays then for each particle 
         diameter at different pressure/temperature values.
-        unit dimensionless        
+        unit dimensionless
+
+
+    Notes
+    -----
+
+    Correction is done according to Mäkelä et al. (1996)
 
     """
    
     l = mean_free_path(temp,pres)
-    return 1.+((2.*l)/dp)*(1.257+0.4*np.exp(-(1.1*dp)/(2.*l)))
+    return 1.+((2.*l)/dp)*(1.246+0.420*np.exp(-(0.87*dp)/(2.*l)))
 
 def particle_diffusivity(dp,temp,pres):
     """ 
@@ -966,7 +991,6 @@ def calc_lung_df(dp):
 
     return DFs 
 
-
 def calc_ldsa(df):
     """
     Calculate total LDSA from number size distribution data
@@ -1020,3 +1044,97 @@ def calc_ldsa(df):
         df_ldsa[ldsa_column_names[i]] = ldsa
 
     return df_ldsa
+
+def flow_velocity_in_pipe(tube_diam,flowrate):
+    """
+    Calculate fluid speed from the flow rate in circular tube
+ 
+    Parameters
+    ----------
+
+    tube_diam : float or array
+        Diameter of circular tube (m)
+    flowrate : float or array
+        Volumetric flow rate (lpm)
+
+    Returns
+    -------
+
+    float or array
+        Speed of fluid (m/s) 
+
+    """
+    
+    volu_flow = flowrate/60000.
+    cross_area = np.pi*(tube_diam/2.)**2
+    
+    return volu_flow/cross_area  
+
+def pipe_reynolds(
+    tube_diam,
+    flowrate,
+    temp,
+    pres):
+    """
+    Calculate Reynolds number in a tube
+
+    Parameters
+    ----------
+
+    tube_diam : float or array
+        Inner diameter of the tube (m)
+    flowrate : float or array
+        Volumetric flow rate (lpm)
+    temp : float or array
+        Temperature in K
+    pres : float or array
+        Pressure in Pa
+
+    Returns
+    -------
+
+    float or array
+        Reynolds number
+
+    """
+
+    volu_flow = flowrate/60000.
+    visc = air_viscosity(temp)
+    dens = air_density(temp,pres)
+
+    return (dens*volu_flow*tube_diam)/(visc*np.pi*(tube_diam/2.0)**2)
+
+def dp2volts(thab_voltage,dp):
+    """
+    Convert particle diameters to DMA voltages
+
+    Parameters
+    ----------
+
+    thab_voltage : float
+        Voltage at THA+ peak (V)
+    dp : float or array
+        Particle diameters (m)
+
+    Returns
+    -------
+
+    float or array:
+        DMA voltage (V) corresponding to dp
+
+    Notes
+    -----
+    
+    Assumptions:
+
+    1) Sheath flow is air
+    2) Mobility standard used is THA+ monomer
+    3) T = 293.15 K and p = 101325 Pa
+
+    """
+
+    thab_mob = (1.0/1.03)*1e-4
+        
+    Zp = diam2mob(dp,293.15,101325.0,1)
+   
+    return (thab_voltage * thab_mob)/Zp
