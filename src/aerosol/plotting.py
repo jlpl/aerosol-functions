@@ -21,7 +21,30 @@ def rotate_xticks(ax,degrees):
         tick.set_rotation(degrees)
         tick.set_ha("right")
         tick.set_rotation_mode("anchor")
-        
+
+def show_matrix_values(
+    ax,
+    matrix,
+    text_format="%d",
+    text_color="white"):
+    """
+    Plot numerical values on top of the cells when
+    visualizing a matrix with imshow()
+
+    Parameters
+    ----------
+    
+    ax : matplotlib.axes
+    matrix : numpy 2d-array
+    text_format : str
+    text_color : str
+
+    """
+    for i in range(matrix.shape[0]):
+        for j in range(matrix.shape[1]):
+            ax.text(j, i, text_format%confmat[i, j],
+                    ha='center', va='center', color=text_color)
+
 def generate_timeticks(
     t_min,
     t_max,
