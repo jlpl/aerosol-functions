@@ -6,7 +6,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.18.1: http://docutils.sourceforge.net/" />
 
-    <title>aerosol package &#8212; aerosol-functions 0.0.13 documentation</title>
+    <title>aerosol package &#8212; aerosol-functions 0.0.14 documentation</title>
     <link rel="stylesheet" type="text/css" href="_static/pygments.css" />
     <link rel="stylesheet" type="text/css" href="_static/alabaster.css" />
     <script data-url_root="./" id="documentation_options" src="_static/documentation_options.js"></script>
@@ -347,7 +347,7 @@ Unit cm3 s-1</p>
 
 <dl class="py function">
 <dt class="sig sig-object py" id="aerosol.functions.calc_ldsa">
-<span class="sig-prename descclassname"><span class="pre">aerosol.functions.</span></span><span class="sig-name descname"><span class="pre">calc_ldsa</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">df</span></span></em><span class="sig-paren">)</span><a class="reference external" href="https://github.com/jlpl/aerosol-functions/blob/master/src/aerosol/functions.py#L1204"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#aerosol.functions.calc_ldsa" title="Permalink to this definition">¶</a></dt>
+<span class="sig-prename descclassname"><span class="pre">aerosol.functions.</span></span><span class="sig-name descname"><span class="pre">calc_ldsa</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">df</span></span></em><span class="sig-paren">)</span><a class="reference external" href="https://github.com/jlpl/aerosol-functions/blob/master/src/aerosol/functions.py#L1211"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#aerosol.functions.calc_ldsa" title="Permalink to this definition">¶</a></dt>
 <dd><p>Calculate total LDSA from number size distribution data</p>
 <p>ICRP, 1994. Human respiratory tract model for 
 radiological protection. A report of a task 
@@ -373,7 +373,7 @@ unit: um2 cm-3</p>
 
 <dl class="py function">
 <dt class="sig sig-object py" id="aerosol.functions.calc_lung_df">
-<span class="sig-prename descclassname"><span class="pre">aerosol.functions.</span></span><span class="sig-name descname"><span class="pre">calc_lung_df</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">dp</span></span></em><span class="sig-paren">)</span><a class="reference external" href="https://github.com/jlpl/aerosol-functions/blob/master/src/aerosol/functions.py#L1160"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#aerosol.functions.calc_lung_df" title="Permalink to this definition">¶</a></dt>
+<span class="sig-prename descclassname"><span class="pre">aerosol.functions.</span></span><span class="sig-name descname"><span class="pre">calc_lung_df</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">dp</span></span></em><span class="sig-paren">)</span><a class="reference external" href="https://github.com/jlpl/aerosol-functions/blob/master/src/aerosol/functions.py#L1167"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#aerosol.functions.calc_lung_df" title="Permalink to this definition">¶</a></dt>
 <dd><p>Calculate lung deposition fractions for particle diameters</p>
 <p>ICRP, 1994. Human respiratory tract model for 
 radiological protection. A report of a task 
@@ -391,6 +391,30 @@ unit: m</p>
 <dd class="field-even"><dl class="simple">
 <dt>pandas.DataFrame</dt><dd><p>Lung deposition fractions for alveoli (“DF_al”), trachea/bronchi (“DF_tb”)
 head-airways (“DF_ha”) and all combiend (“DF_tot”)</p>
+</dd>
+</dl>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="aerosol.functions.calc_tube_residence_time">
+<span class="sig-prename descclassname"><span class="pre">aerosol.functions.</span></span><span class="sig-name descname"><span class="pre">calc_tube_residence_time</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">tube_diam</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">tube_length</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">flowrate</span></span></em><span class="sig-paren">)</span><a class="reference external" href="https://github.com/jlpl/aerosol-functions/blob/master/src/aerosol/functions.py#L1595"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#aerosol.functions.calc_tube_residence_time" title="Permalink to this definition">¶</a></dt>
+<dd><p>Calculate residence time in a circular tube</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><dl class="simple">
+<dt><strong>tube_diam</strong><span class="classifier">float or series of length m</span></dt><dd><p>Inner diameter of the tube (m)</p>
+</dd>
+<dt><strong>tube_length</strong><span class="classifier">float or series of length m</span></dt><dd><p>Length of the tube (m)</p>
+</dd>
+<dt><strong>flowrate</strong><span class="classifier">float or series of length n</span></dt><dd><p>Volumetric flow rate (lpm)</p>
+</dd>
+</dl>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><dl class="simple">
+<dt>float or dataframe of shape (n,m)</dt><dd><p>Residence time in seconds</p>
 </dd>
 </dl>
 </dd>
@@ -522,7 +546,7 @@ unnormalized number concentrations.</p>
 
 <dl class="py function">
 <dt class="sig sig-object py" id="aerosol.functions.dp2volts">
-<span class="sig-prename descclassname"><span class="pre">aerosol.functions.</span></span><span class="sig-name descname"><span class="pre">dp2volts</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">thab_voltage</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dp</span></span></em><span class="sig-paren">)</span><a class="reference external" href="https://github.com/jlpl/aerosol-functions/blob/master/src/aerosol/functions.py#L1344"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#aerosol.functions.dp2volts" title="Permalink to this definition">¶</a></dt>
+<span class="sig-prename descclassname"><span class="pre">aerosol.functions.</span></span><span class="sig-name descname"><span class="pre">dp2volts</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">thab_voltage</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dp</span></span></em><span class="sig-paren">)</span><a class="reference external" href="https://github.com/jlpl/aerosol-functions/blob/master/src/aerosol/functions.py#L1351"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#aerosol.functions.dp2volts" title="Permalink to this definition">¶</a></dt>
 <dd><p>Convert particle diameters to DMA voltages</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
@@ -552,7 +576,7 @@ unnormalized number concentrations.</p>
 
 <dl class="py function">
 <dt class="sig sig-object py" id="aerosol.functions.eq_charge_frac">
-<span class="sig-prename descclassname"><span class="pre">aerosol.functions.</span></span><span class="sig-name descname"><span class="pre">eq_charge_frac</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">dp</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">N</span></span></em><span class="sig-paren">)</span><a class="reference external" href="https://github.com/jlpl/aerosol-functions/blob/master/src/aerosol/functions.py#L1422"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#aerosol.functions.eq_charge_frac" title="Permalink to this definition">¶</a></dt>
+<span class="sig-prename descclassname"><span class="pre">aerosol.functions.</span></span><span class="sig-name descname"><span class="pre">eq_charge_frac</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">dp</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">N</span></span></em><span class="sig-paren">)</span><a class="reference external" href="https://github.com/jlpl/aerosol-functions/blob/master/src/aerosol/functions.py#L1429"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#aerosol.functions.eq_charge_frac" title="Permalink to this definition">¶</a></dt>
 <dd><p>Calculate equilibrium charge fraction using Wiedensohler (1988) approximation</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
@@ -575,7 +599,7 @@ elementary charges</p>
 
 <dl class="py function">
 <dt class="sig sig-object py" id="aerosol.functions.flow_velocity_in_pipe">
-<span class="sig-prename descclassname"><span class="pre">aerosol.functions.</span></span><span class="sig-name descname"><span class="pre">flow_velocity_in_pipe</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">tube_diam</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">flowrate</span></span></em><span class="sig-paren">)</span><a class="reference external" href="https://github.com/jlpl/aerosol-functions/blob/master/src/aerosol/functions.py#L1258"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#aerosol.functions.flow_velocity_in_pipe" title="Permalink to this definition">¶</a></dt>
+<span class="sig-prename descclassname"><span class="pre">aerosol.functions.</span></span><span class="sig-name descname"><span class="pre">flow_velocity_in_pipe</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">tube_diam</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">flowrate</span></span></em><span class="sig-paren">)</span><a class="reference external" href="https://github.com/jlpl/aerosol-functions/blob/master/src/aerosol/functions.py#L1265"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#aerosol.functions.flow_velocity_in_pipe" title="Permalink to this definition">¶</a></dt>
 <dd><p>Calculate fluid speed from the flow rate in circular tube</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
@@ -597,7 +621,7 @@ elementary charges</p>
 
 <dl class="py function">
 <dt class="sig sig-object py" id="aerosol.functions.ions2particles">
-<span class="sig-prename descclassname"><span class="pre">aerosol.functions.</span></span><span class="sig-name descname"><span class="pre">ions2particles</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">neg_ions</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">pos_ions</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">temp</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">293.15</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mob_ratio</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference external" href="https://github.com/jlpl/aerosol-functions/blob/master/src/aerosol/functions.py#L1495"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#aerosol.functions.ions2particles" title="Permalink to this definition">¶</a></dt>
+<span class="sig-prename descclassname"><span class="pre">aerosol.functions.</span></span><span class="sig-name descname"><span class="pre">ions2particles</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">neg_ions</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">pos_ions</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">temp</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">293.15</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mob_ratio</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference external" href="https://github.com/jlpl/aerosol-functions/blob/master/src/aerosol/functions.py#L1502"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#aerosol.functions.ions2particles" title="Permalink to this definition">¶</a></dt>
 <dd><p>Estimate particle number size distribution from ions using Li et al. (2022)</p>
 <dl class="field-list">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
@@ -751,7 +775,7 @@ point, unit: m s-1</p>
 
 <dl class="py function">
 <dt class="sig sig-object py" id="aerosol.functions.pipe_reynolds">
-<span class="sig-prename descclassname"><span class="pre">aerosol.functions.</span></span><span class="sig-name descname"><span class="pre">pipe_reynolds</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">tube_diam</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">flowrate</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">temp</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">pres</span></span></em><span class="sig-paren">)</span><a class="reference external" href="https://github.com/jlpl/aerosol-functions/blob/master/src/aerosol/functions.py#L1297"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#aerosol.functions.pipe_reynolds" title="Permalink to this definition">¶</a></dt>
+<span class="sig-prename descclassname"><span class="pre">aerosol.functions.</span></span><span class="sig-name descname"><span class="pre">pipe_reynolds</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">tube_diam</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">flowrate</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">temp</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">pres</span></span></em><span class="sig-paren">)</span><a class="reference external" href="https://github.com/jlpl/aerosol-functions/blob/master/src/aerosol/functions.py#L1304"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#aerosol.functions.pipe_reynolds" title="Permalink to this definition">¶</a></dt>
 <dd><p>Calculate Reynolds number in a tube</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
@@ -805,7 +829,7 @@ unit dimensionless</p>
 
 <dl class="py function">
 <dt class="sig sig-object py" id="aerosol.functions.surf_dist">
-<span class="sig-prename descclassname"><span class="pre">aerosol.functions.</span></span><span class="sig-name descname"><span class="pre">surf_dist</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">df</span></span></em><span class="sig-paren">)</span><a class="reference external" href="https://github.com/jlpl/aerosol-functions/blob/master/src/aerosol/functions.py#L1114"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#aerosol.functions.surf_dist" title="Permalink to this definition">¶</a></dt>
+<span class="sig-prename descclassname"><span class="pre">aerosol.functions.</span></span><span class="sig-name descname"><span class="pre">surf_dist</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">df</span></span></em><span class="sig-paren">)</span><a class="reference external" href="https://github.com/jlpl/aerosol-functions/blob/master/src/aerosol/functions.py#L1121"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#aerosol.functions.surf_dist" title="Permalink to this definition">¶</a></dt>
 <dd><p>Calculate the aerosol surface area size distribution</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
@@ -832,7 +856,7 @@ straight cylindrical tube assuming a laminar flow regime</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><dl class="simple">
-<dt><strong>diam</strong><span class="classifier">float or series of lenght m</span></dt><dd><p>Particle diameters for which to calculate the
+<dt><strong>diam</strong><span class="classifier">float or series of length m</span></dt><dd><p>Particle diameters for which to calculate the
 losses, unit: m</p>
 </dd>
 <dt><strong>flowrate</strong><span class="classifier">float or series of length n</span></dt><dd><p>unit: L/min</p>
@@ -850,7 +874,7 @@ unit: Pa</p>
 </dd>
 <dt class="field-even">Returns<span class="colon">:</span></dt>
 <dd class="field-even"><dl class="simple">
-<dt>numpy.array</dt><dd><p>Fraction of particles passing through.
+<dt>float or dataframe of shape (n,m)</dt><dd><p>Fraction of particles passing through.
 Each column represents diameter and each
 each row represents different temperature
 pressure and flowrate value</p>
@@ -862,7 +886,7 @@ pressure and flowrate value</p>
 
 <dl class="py function">
 <dt class="sig sig-object py" id="aerosol.functions.utc2solar">
-<span class="sig-prename descclassname"><span class="pre">aerosol.functions.</span></span><span class="sig-name descname"><span class="pre">utc2solar</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">utc_time</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">lon</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">lat</span></span></em><span class="sig-paren">)</span><a class="reference external" href="https://github.com/jlpl/aerosol-functions/blob/master/src/aerosol/functions.py#L1456"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#aerosol.functions.utc2solar" title="Permalink to this definition">¶</a></dt>
+<span class="sig-prename descclassname"><span class="pre">aerosol.functions.</span></span><span class="sig-name descname"><span class="pre">utc2solar</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">utc_time</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">lon</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">lat</span></span></em><span class="sig-paren">)</span><a class="reference external" href="https://github.com/jlpl/aerosol-functions/blob/master/src/aerosol/functions.py#L1463"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#aerosol.functions.utc2solar" title="Permalink to this definition">¶</a></dt>
 <dd><p>Convert utc time to solar time (solar maximum occurs at noon)</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
@@ -885,7 +909,7 @@ pressure and flowrate value</p>
 
 <dl class="py function">
 <dt class="sig sig-object py" id="aerosol.functions.vol_dist">
-<span class="sig-prename descclassname"><span class="pre">aerosol.functions.</span></span><span class="sig-name descname"><span class="pre">vol_dist</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">df</span></span></em><span class="sig-paren">)</span><a class="reference external" href="https://github.com/jlpl/aerosol-functions/blob/master/src/aerosol/functions.py#L1138"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#aerosol.functions.vol_dist" title="Permalink to this definition">¶</a></dt>
+<span class="sig-prename descclassname"><span class="pre">aerosol.functions.</span></span><span class="sig-name descname"><span class="pre">vol_dist</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">df</span></span></em><span class="sig-paren">)</span><a class="reference external" href="https://github.com/jlpl/aerosol-functions/blob/master/src/aerosol/functions.py#L1145"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#aerosol.functions.vol_dist" title="Permalink to this definition">¶</a></dt>
 <dd><p>Calculate the aerosol volume size distribution</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
@@ -906,7 +930,7 @@ unit: m3 cm-3</p>
 
 <dl class="py function">
 <dt class="sig sig-object py" id="aerosol.functions.volts2dp">
-<span class="sig-prename descclassname"><span class="pre">aerosol.functions.</span></span><span class="sig-name descname"><span class="pre">volts2dp</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">thab_voltage</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dma_voltage</span></span></em><span class="sig-paren">)</span><a class="reference external" href="https://github.com/jlpl/aerosol-functions/blob/master/src/aerosol/functions.py#L1382"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#aerosol.functions.volts2dp" title="Permalink to this definition">¶</a></dt>
+<span class="sig-prename descclassname"><span class="pre">aerosol.functions.</span></span><span class="sig-name descname"><span class="pre">volts2dp</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">thab_voltage</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dma_voltage</span></span></em><span class="sig-paren">)</span><a class="reference external" href="https://github.com/jlpl/aerosol-functions/blob/master/src/aerosol/functions.py#L1389"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#aerosol.functions.volts2dp" title="Permalink to this definition">¶</a></dt>
 <dd><p>Convert DMA voltages to particle diameters</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
@@ -1124,7 +1148,7 @@ If False, use ticklabels only on outer subplots.</p>
             </a></p><div class="version">
 <center><a href="https://jlpl.github.io/aerosol-functions/">home</a></center>
 <center><a href="https://github.com/jlpl/aerosol-functions">github</a></center>
-<center>v. 0.0.13</center>
+<center>v. 0.0.14</center>
 </div><h3><a href="index.html"></a></h3>
 <ul class="current">
 <li class="toctree-l1 current"><a class="current reference internal" href="#">aerosol package</a><ul>
@@ -1141,6 +1165,7 @@ If False, use ticklabels only on outer subplots.</p>
 <li class="toctree-l3"><a class="reference internal" href="#aerosol.functions.calc_ion_formation_rate"><code class="docutils literal notranslate"><span class="pre">calc_ion_formation_rate()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="#aerosol.functions.calc_ldsa"><code class="docutils literal notranslate"><span class="pre">calc_ldsa()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="#aerosol.functions.calc_lung_df"><code class="docutils literal notranslate"><span class="pre">calc_lung_df()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#aerosol.functions.calc_tube_residence_time"><code class="docutils literal notranslate"><span class="pre">calc_tube_residence_time()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="#aerosol.functions.coagulation_coef"><code class="docutils literal notranslate"><span class="pre">coagulation_coef()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="#aerosol.functions.datenum2datetime"><code class="docutils literal notranslate"><span class="pre">datenum2datetime()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="#aerosol.functions.datetime2datenum"><code class="docutils literal notranslate"><span class="pre">datetime2datenum()</span></code></a></li>

@@ -1065,7 +1065,7 @@ def tubeloss(diam, flowrate, tubelength, temp, pres):
     Parameters
     ----------
     
-    diam : float or series of lenght m
+    diam : float or series of length m
         Particle diameters for which to calculate the
         losses, unit: m
     flowrate : float or series of length n
@@ -1083,7 +1083,7 @@ def tubeloss(diam, flowrate, tubelength, temp, pres):
     Returns
     -------
 
-    numpy.array
+    float or dataframe of shape (n,m)
         Fraction of particles passing through.
         Each column represents diameter and each
         each row represents different temperature
@@ -1091,16 +1091,20 @@ def tubeloss(diam, flowrate, tubelength, temp, pres):
         
     """
 
+    float_input=is_input_float([diam,flowrate,temp,pres])
+
     temp=pd.Series(temp)
     pres=pd.Series(pres)
     diam=pd.Series(diam)
     flowrate = pd.Series(flowrate)*1.667e-5
+
+    idx = get_index([temp,pres,flowrate])
     
     D = particle_diffusivity(diam,temp,pres)
 
-    rmuu = D*tubelength*(1./flowrate.values.reshape(-1,1))
+    rmuu = D.values*tubelength*(1./flowrate.values.reshape(-1,1))
     
-    penetration = np.nan*pd.DataFrame(np.ones(rmuu.shape))
+    penetration = np.nan*np.ones(rmuu.shape)
 
     condition1 = (rmuu<0.009)
     condition2 = (rmuu>=0.009)
@@ -1108,7 +1112,10 @@ def tubeloss(diam, flowrate, tubelength, temp, pres):
     penetration[condition1] = 1.-5.5*rmuu[condition1]**(2./3.)+3.77*rmuu[condition1]
     penetration[condition2] = 0.819*np.exp(-11.5*rmuu[condition2])+0.0975*np.exp(-70.1*rmuu[condition2])
     
-    return penetration.values
+    if float_input:
+        return penetration[0][0]
+    else:
+        return pd.DataFrame(index=idx,columns=diam.values,data=penetration)
 
 
 def surf_dist(df):
@@ -1584,3 +1591,50 @@ def ions2particles(neg_ions,pos_ions,temp=293.15,mob_ratio=None):
         particles.iloc[i,:] = (pos_ions.iloc[i,:] + neg_ions.iloc[i,:])/f
             
     return particles
+
+def calc_tube_residence_time(tube_diam,tube_length,flowrate):
+    """
+    Calculate residence time in a circular tube
+
+    Parameters
+    ----------
+
+    tube_diam : float or series of length m
+        Inner diameter of the tube (m)
+    tube_length : float or series of length m
+        Length of the tube (m)
+    flowrate : float or series of length n
+        Volumetric flow rate (lpm)
+
+    Returns
+    -------
+
+    float or dataframe of shape (n,m)
+        Residence time in seconds
+
+    """
+
+    float_input = is_input_float([tube_diam,tube_length,flowrate])
+
+    tube_diam = pd.Series(tube_diam)
+    tube_length = pd.Series(tube_length)
+    flowrate = pd.Series(flowrate)
+
+    tube_diam = tube_diam.values
+    tube_length = tube_length.values
+    flowrate = flowrate.values.reshape(-1,1)
+         
+    volu_flow = flowrate/60000.
+    tube_volume = np.pi*tube_diam**2*(1/4.)*tube_length
+
+    rt = tube_volume/volu_flow
+
+    if float_input:
+        return rt[0][0]
+    else:
+        return pd.DataFrame(index = flowrate.flatten(), columns=tube_volume, data=rt)
+
+
+
+
+
