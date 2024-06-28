@@ -1348,7 +1348,7 @@ def pipe_reynolds(
     else:
         return pd.DataFrame(index = flowrate.flatten(), columns=tube_diam, data=Re)
 
-def dp2volts(thab_voltage,dp):
+def thab_dp2volts(thab_voltage,dp):
     """
     Convert particle diameters to DMA voltages
 
@@ -1386,7 +1386,7 @@ def dp2volts(thab_voltage,dp):
     return (thab_voltage * thab_mob)/Zp
 
 
-def volts2dp(thab_voltage,dma_voltage):
+def thab_volts2dp(thab_voltage,dma_voltage):
     """
     Convert DMA voltages to particle diameters
 
@@ -1395,13 +1395,13 @@ def volts2dp(thab_voltage,dma_voltage):
 
     thab_voltage : float
         Voltage at THA+ peak (V)
-    dma_voltage : float or series
+    dma_voltage : float
         DMA voltage (V)
 
     Returns
     -------
 
-    float or series:
+    float:
         particle diameter corresponding to DMA voltage (m)
 
     Notes
@@ -1633,6 +1633,167 @@ def calc_tube_residence_time(tube_diam,tube_length,flowrate):
         return rt[0][0]
     else:
         return pd.DataFrame(index = flowrate.flatten(), columns=tube_volume, data=rt)
+
+def calc_ion_production_rate(
+    df_ions,
+    df_particles,
+    temp=293.15,
+    pres=101325.0):
+    """
+    Calculate the ion production rate from measurements
+
+    Parameters
+    ----------
+
+    df_ions : dataframe of shape (n,m)
+        negative or positive ion number size distribution unit cm-3
+    df_particles : dataframe of shape (n,m)
+        particle number size distribution unit cm-3
+    temp : float or series of length n
+        ambient temperature unit K
+    pres : float or series of length n
+        ambient pressure unit Pa
+
+    Returns
+    -------
+
+    series of lenght n
+        ion production rate in cm-3 s-1
+
+    Notes
+    -----
+
+    """
+
+    temp = pd.Series(temp)
+    pres = pd.Series(pres)
+
+    if len(temp)==1:
+        temp = pd.Series(index = df_ions.index, data = temp)
+    else:
+        temp = temp.reindex(df_ions.index, method="nearest")
+
+    if len(pres)==1:
+        pres = pd.Series(index = df_ions.index, data = pres)
+    else:
+        pres = pres.reindex(df_ions.index, method="nearest")
+
+    alpha = 1.6e-6 # cm3 s-1
+    dp1 = 1e-9
+    dp2 = 2e-9
+    
+    cluster_ion_conc = calc_conc(df_ions,dp1,dp2)
+    
+    ion_dp = df_ions.columns.values.astype(float)
+    
+    findex = np.argwhere((ion_dp>dp1) & (ion_dp<dp2)).flatten() 
+
+    sink_term = np.zeros(df_ions.shape[0])
+    for dp in ion_dp[findex]: 
+        sink_term = sink_term + calc_coags(df_particles,dp,temp,pres).values.flatten()*cluster_ion_conc.values.flatten()
+    
+    # Ion-ion recombination term
+    rec_term = cluster_ion_conc.values.flatten()**2*alpha
+
+    ion_production_rate = rec_term + sink_term
+
+    return pd.Series(index=df_ions.index, data=ion_production_rate)
+
+def dma_volts2mob(Q,R1,R2,L,V):
+    """
+    Theoretical selected mobility from cylindrical DMA
+
+    Parameters
+    ----------
+
+    Q : float
+        sheath flow rate, unit lpm
+
+    R1 : float
+        inner electrode radius, unit m
+
+    R2 : float
+        outer electrode radius, unit m
+
+    L : float
+        effective electrode length, unit m
+
+    V : float or series
+        applied voltage, unit V
+
+    Returns
+    -------
+
+    float or series
+        selected mobility, unit m2 s-1 V-1
+
+    """
+
+    return ((Q*1.667e-5)*np.log(R2/R1))/(2.*np.pi*L*V)
+
+def dma_mob2volts(Q,R1,R2,L,Z):
+    """
+    Cylindrical DMA voltage corresponding to mobility
+
+    Parameters
+    ----------
+
+    Q : float
+        sheath flow rate, unit lpm
+
+    R1 : float
+        inner electrode radius, unit m
+
+    R2 : float
+        outer electrode radius, unit m
+
+    L : float
+        effective electrode length, unit m
+
+    Z : float
+        mobility, unit m2 s-1 V-1
+
+    Returns
+    -------
+
+    float
+        DMA voltage, unit V
+
+    """
+
+    return ((Q*1.667e-5)*np.log(R2/R1))/(2.*np.pi*L*Z)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
