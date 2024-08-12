@@ -551,7 +551,38 @@ def calc_coags(df,dp,temp,pres,dp_start=None):
         return coags.values[0][0]
     else:
         return coags
-   
+
+def cs2coags(cs,dp,m=-1.6):
+    """
+    Estimate coagulation sink from condensation sink
+
+    Parameters
+    ----------
+
+    cs : pandas.Series
+        The condensation sink time series: unit s-1
+    dp : float
+        Particle diameter for which CoagS is calculated, unit: nm
+    m : float
+        Exponent in the equation
+
+    Returns
+    -------
+
+    coags : pandas.Series
+        Coagulation sink time series for size dp
+
+    References
+    ----------
+
+    Kulmala et al (2012), doi:10.1038/nprot.2012.091
+
+    """
+
+    return cs * (dp/0.71)**m
+
+
+
 def diam2mob(dp,temp,pres,ne):
     """ 
     Convert electrical mobility diameter to electrical mobility in air
@@ -919,11 +950,7 @@ def calc_formation_rate(
         # calculate sink to the pre-existing particles 
         sink_term = np.zeros(len(df.index))
         for j in idx:
-            # if the particle does not exit the size range due to coagulation we do nothing
-            if ( ((np.pi/6.)*(dp1[i]**3 + dp[j]**3)) <= ((np.pi/6.)*dp2[i]**3) ):
-                continue
-            else:
-                sink_term = sink_term + calc_coags(df,dp[j],temp,pres).values.flatten() * dn.iloc[:,j].values.flatten()
+            sink_term = sink_term + calc_coags(df,dp[j],temp,pres).values.flatten() * dn.iloc[:,j].values.flatten()
     
         # Conc term (observed change in the size range number concentration)
         dt = df.index.to_frame().diff().values.astype("timedelta64[s]").astype(float).flatten()
@@ -1017,12 +1044,8 @@ def calc_ion_formation_rate(
         sink_term_negions = np.zeros(len(time))
         sink_term_posions = np.zeros(len(time))
         for j in idx:
-            # if the particle does not exit the size range due to coagulation we do nothing
-            if ( ((np.pi/6.)*(dp1[i]**3 + dp[j]**3)) <= ((np.pi/6.)*dp2[i]**3) ):
-                continue
-            else:
-                sink_term_negions = sink_term_negions + calc_coags(df_particles,dp[j],temp,pres).values.flatten() * dn_negions.iloc[:,j].values.flatten()
-                sink_term_posions = sink_term_posions + calc_coags(df_particles,dp[j],temp,pres).values.flatten() * dn_posions.iloc[:,j].values.flatten()
+            sink_term_negions = sink_term_negions + calc_coags(df_particles,dp[j],temp,pres).values.flatten() * dn_negions.iloc[:,j].values.flatten()
+            sink_term_posions = sink_term_posions + calc_coags(df_particles,dp[j],temp,pres).values.flatten() * dn_posions.iloc[:,j].values.flatten()
 
         # Conc terms
         dt = time.to_frame().diff().values.astype("timedelta64[s]").astype(float).flatten()
