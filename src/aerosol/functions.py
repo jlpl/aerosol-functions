@@ -512,8 +512,6 @@ def calc_coags(df,dp,temp,pres,dp_start=None):
 
     """
 
-    float_input=is_input_float([dp,temp,pres])
-
     # index is now taken from the size distribution
 
     temp=pd.Series(temp)
@@ -541,16 +539,12 @@ def calc_coags(df,dp,temp,pres,dp_start=None):
         else:
             df = df.loc[:,df.columns.values.astype(float)>=dp_start]
         a = dndlogdp2dn(df) # dataframe
-        b = 1e6*coagulation_coef(dpi,df.columns.values.astype(float),temp,pres)
-        # at column number i insert column with header dpi and it 
-        # the column is equal to (a*b).sum(axis=1,min_count=1) 
-        coags.insert(i,dpi,(a*b).sum(axis=1,min_count=1))
+        b = 1e6*coagulation_coef(dpi,pd.Series(df.columns.values.astype(float)),temp,pres)
+        c = pd.DataFrame(a.values*b.values).sum(axis=1,min_count=1)
+        coags.insert(i,dpi,c.values)
         i+=1
 
-    if float_input:
-        return coags.values[0][0]
-    else:
-        return coags
+    return coags
 
 def cs2coags(cs,dp,m=-1.6):
     """
@@ -712,13 +706,15 @@ def binary_diffusivity(temp,pres,Ma,Mb,Va,Vb):
 
     temp = pd.Series(temp)
     pres = pd.Series(pres)
+
+    idx = get_index([temp,pres])
     
-    diffusivity = (1.013e-2*(temp**1.75)*np.sqrt((1./Ma)+(1./Mb)))/(pres*(Va**(1./3.)+Vb**(1./3.))**2)
+    diffusivity = (1.013e-2*(temp.values**1.75)*np.sqrt((1./Ma)+(1./Mb)))/(pres.values*(Va**(1./3.)+Vb**(1./3.))**2)
     
     if float_input:
-        return diffusivity.values[0]
+        return diffusivity[0]
     else:
-        return diffusivity
+        return pd.Series(index = idx, data = diffusivity)
 
 
 def beta(dp,temp,pres,diffusivity,molar_mass):
@@ -813,12 +809,12 @@ def calc_cs(df,temp,pres):
     pres = pd.Series(pres)
 
     if len(temp)==1:
-        temp = pd.Series(index = df.index, data = temp)
+        temp = pd.Series(index = df.index, data = temp.values[0])
     else:
         temp = temp.reindex(df.index, method="nearest")
 
     if len(pres)==1:
-        pres = pd.Series(index = df.index, data = pres)
+        pres = pd.Series(index = df.index, data = pres.values[0])
     else:
         pres = pres.reindex(df.index, method="nearest")
 
@@ -827,19 +823,19 @@ def calc_cs(df,temp,pres):
     V_air = 19.7      
     V_h2so4 = 51.96  
 
-    dn = dndlogdp2dn(df)
+    dn = dndlogdp2dn(df) # dataframe
 
-    dp = pd.Series(df.columns.values.astype(float))
+    dp = pd.Series(df.columns.values.astype(float)) #series
 
-    diffu = binary_diffusivity(temp,pres,M_h2so4,M_air,V_h2so4,V_air)
+    diffu = binary_diffusivity(temp,pres,M_h2so4,M_air,V_h2so4,V_air) #series
 
-    b = beta(dp,temp,pres,diffu,M_h2so4)
+    b = beta(dp,temp,pres,diffu,M_h2so4) #dataframe
 
-    df2 = (1e6*dn*(b*dp.values)).sum(axis=1,min_count=1)
+    df2 = pd.DataFrame(1e6*dn.values*(b.values*dp.values)).sum(axis=1,min_count=1) #dataframe
 
-    cs = (4.*np.pi*diffu)*df2
+    cs = (4.*np.pi*diffu.values)*df2.values
 
-    return cs
+    return pd.Series(index = df.index, data = cs)
 
 
 def calc_conc(df,dmin,dmax,frac=0.5):
