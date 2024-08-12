@@ -7,6 +7,69 @@ from matplotlib.pyplot import cm
 from datetime import datetime, timedelta
 from scipy.optimize import minimize
 
+
+def set_legend_outside(ax,handles=None,labels=None,fs=10):
+    """
+    Put legend outside axes (upper right corner)
+
+    Parameters
+    ----------
+
+    ax : Axes
+        axes to add the legend to
+
+    handles : list of handles
+        list of lines or points in the legend
+
+    labels : list of strings
+        labels for the legend entries
+
+    fs : int
+        font size
+
+    Returns
+    -------
+
+    Legend
+
+    """
+ 
+    if ((handles is not None) and (labels is not None)):
+        leg = ax.legend(
+            handles,
+            labels,
+            bbox_to_anchor=(1, 1), 
+            loc='upper left',
+            borderaxespad=0,
+            fontsize=fs,
+            frameon=False)
+    elif handles is not None:
+        leg = ax.legend(
+            handles=handles,
+            bbox_to_anchor=(1, 1), 
+            loc='upper left',
+            borderaxespad=0,
+            fontsize=fs,
+            frameon=False)
+    elif labels is not None:
+        leg = ax.legend(
+            labels,
+            bbox_to_anchor=(1, 1), 
+            loc='upper left',
+            borderaxespad=0,
+            fontsize=fs,
+            frameon=False)
+    else:
+        leg = ax.legend(
+            bbox_to_anchor=(1, 1), 
+            loc='upper left',
+            borderaxespad=0,
+            fontsize=fs,
+            frameon=False)
+
+    return leg
+
+
 def rotate_xticks(ax,degrees):
     """
     Parameters

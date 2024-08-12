@@ -147,8 +147,8 @@ def calc_bin_edges(dp):
     dp = dp.values
     logdp_mid = np.log10(dp)
     logdp = (logdp_mid[:-1]+logdp_mid[1:])/2.0
-    minval = [logdp_mid.max()+(logdp_mid.max()-logdp.max())]
-    maxval = [logdp_mid.min()-(logdp.min()-logdp_mid.min())]
+    maxval = [logdp_mid.max()+(logdp_mid.max()-logdp.max())]
+    minval = [logdp_mid.min()-(logdp.min()-logdp_mid.min())]
     logdp = np.concatenate((minval,logdp,maxval))
     
     return pd.Series(logdp)
@@ -811,7 +811,7 @@ def calc_cs(df,temp,pres):
     return cs
 
 
-def calc_conc(df,dmin,dmax):
+def calc_conc(df,dmin,dmax,frac=0.5):
     """
     Calculate particle number concentration from aerosol 
     number-size distribution
@@ -825,6 +825,8 @@ def calc_conc(df,dmin,dmax):
         Size range lower diameter(s), unit: m
     dmax : float or series of length n
         Size range upper diameter(s), unit: m
+    frac : float
+        Minimum fraction of available data when calculating a concentration point
 
     Returns
     -------
@@ -851,7 +853,7 @@ def calc_conc(df,dmin,dmax):
             conc=df.iloc[:,findex]
             logdp = calc_bin_edges(pd.Series(dp_subset))
             dlogdp = np.diff(logdp)
-            conc = (conc*dlogdp).sum(axis=1, min_count=1)
+            conc = (conc*dlogdp).sum(axis=1, min_count=int(frac*len(findex)))
 
         conc_df.insert(i,i,conc)
 
