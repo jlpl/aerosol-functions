@@ -30,12 +30,10 @@ E_0=8.85418781e-12    # permittivity of vacuum
 K_B=1.381e-23         # Boltzmann constant 
 R=8.3413              # gas constant
 
-
-
 # Helper functions
 def is_input_float(args):
     for arg in args:
-        if isinstance(arg,float) is False:
+        if (isinstance(arg,float) | isinstance(arg,int)) is False:
             return False
     return True
 
@@ -268,7 +266,7 @@ def slipcorr(dp,temp,pres):
 
     """
    
-    float_input=is_input_float([dp,temp,pres])
+    float_input = is_input_float([dp,temp,pres])
 
     dp = pd.Series(dp)
     temp = pd.Series(temp)
@@ -413,7 +411,7 @@ def particle_mean_free_path(dp,temp,pres):
     else:
         return pd.DataFrame(index=idx, columns=dp, data=v_therm)
 
-def coagulation_coef(dp1,dp2,temp,pres):
+def coagulation_coef(dp1,dp2,temp=293.15,pres=101325.):
     """ 
     Calculate Brownian coagulation coefficient (Fuchs)
 
@@ -538,7 +536,7 @@ def calc_coags(df,dp,temp,pres,dp_start=None):
             df = df.loc[:,df.columns.values.astype(float)>=dpi]
         else:
             df = df.loc[:,df.columns.values.astype(float)>=dp_start]
-        a = dndlogdp2dn(df) # dataframe
+        a = dndlogdp2dn(df)
         b = 1e6*coagulation_coef(dpi,pd.Series(df.columns.values.astype(float)),temp,pres)
         c = pd.DataFrame(a.values*b.values).sum(axis=1,min_count=1)
         coags.insert(i,dpi,c.values)
@@ -577,57 +575,45 @@ def cs2coags(cs,dp,m=-1.6):
 
 
 
-def diam2mob(dp,temp,pres,ne):
+def diam2mob(dp,temp=293.15,pres=101325.0,ne=1):
     """ 
     Convert electrical mobility diameter to electrical mobility in air
 
     Parameters
     ----------
 
-    dp : float or series of lenght m
+    dp : float
         particle diameter(s),
         unit : m
-    temp : float or series of length n
-        ambient temperature, 
+    temp : float
+        ambient temperature
+        default 20 C 
         unit: K
-    pres : float or series of length n
-        ambient pressure, 
+    pres : float
+        ambient pressure,
+        default 1 atm 
         unit: Pa
     ne : int
         number of charges on the aerosol particle
+        default 1
 
     Returns
     -------
 
-    float or dataframe of shape (n,m)
-        particle electrical mobility or mobilities, 
+    float
+        particle electrical mobility, 
         unit: m2 s-1 V-1
 
     """
 
-    float_input = is_input_float([dp,temp,pres])
-
-    dp = pd.Series(dp)
-    temp = pd.Series(temp)
-    pres = pd.Series(pres)
-
-    idx = get_index([temp,pres])
-
-    cc = slipcorr(dp,temp,pres)
-    mu = air_viscosity(temp)
-
-    cc = cc.values
-    mu = mu.values.reshape(-1,1)
-    dp = dp.values
+    cc = slipcorr(dp,temp,pres) # float
+    mu = air_viscosity(temp) # float
 
     Zp = (ne*E*cc)/(3.*np.pi*mu*dp)
 
-    if float_input:
-        return Zp[0][0]
-    else:
-        return pd.DataFrame(index=idx,columns=dp,data=Zp)
+    return Zp
 
-def mob2diam(Zp,temp,pres,ne):
+def mob2diam(Zp,temp=293.15,pres=101325.,ne=1):
     """
     Convert electrical mobility to electrical mobility diameter in air
 
@@ -662,7 +648,6 @@ def mob2diam(Zp,temp,pres,ne):
     diam = minimize(minimize_this, dp0, args=(Zp,), tol=1e-20, method='Nelder-Mead').x[0]
             
     return diam
-
 
 
 def binary_diffusivity(temp,pres,Ma,Mb,Va,Vb):
@@ -1078,7 +1063,7 @@ def calc_ion_formation_rate(
     return J_negions, J_posions
 
 
-def tubeloss(diam, flowrate, tubelength, temp, pres):
+def tubeloss(diam, flowrate, tubelength, temp=293.15, pres=101325.):
     """
     Calculate diffusional particle losses to walls of
     straight cylindrical tube assuming a laminar flow regime
@@ -1211,7 +1196,7 @@ def calc_lung_df(dp):
     """
 
     # convert from meters to micrometers
-    dp = dp*1e6
+    dp = dp.values*1e6
 
     # Deposition fractions
     IF = 1-0.5*(1.-1./(1.+0.00076*dp**2.8))
@@ -1255,18 +1240,18 @@ def calc_ldsa(df):
     """
     
     # m -> um
-    dp = df.columns.values.astype(float)*1e6
+    dp = pd.Series(df.columns.values.astype(float))*1e6
 
-    logdp = calc_bin_edges(pd.Series(dp))
-    dlogdp = np.diff(logdp)
+    logdp = calc_bin_edges(pd.Series(dp)).values #array
+    dlogdp = np.diff(logdp) #array
 
     # m2/cm-3 -> um2/cm-3
-    surface_dist = surf_dist(df)*1e12
+    surface_dist = surf_dist(df)*1e12 #dataframe
 
     # input needs ot be in m
-    depo_fracs = calc_lung_df(dp*1e-6)
+    depo_fracs = calc_lung_df(dp*1e-6) #dataframe 
 
-    ldsa_dist_al = surface_dist * depo_fracs.iloc[:,0].values.flatten()
+    ldsa_dist_al = surface_dist * depo_fracs.iloc[:,0].values.flatten() #dataframes
     ldsa_dist_tb = surface_dist * depo_fracs.iloc[:,1].values.flatten()
     ldsa_dist_ha = surface_dist * depo_fracs.iloc[:,2].values.flatten()
     ldsa_dist_tot = surface_dist * depo_fracs.iloc[:,3].values.flatten()
@@ -1308,7 +1293,6 @@ def flow_velocity_in_pipe(tube_diam,flowrate):
     tube_diam = pd.Series(tube_diam)
     flowrate = pd.Series(flowrate)
  
-
     tube_diam = tube_diam.values
     flowrate = flowrate.values.reshape(-1,1)
     
@@ -1325,8 +1309,8 @@ def flow_velocity_in_pipe(tube_diam,flowrate):
 def pipe_reynolds(
     tube_diam,
     flowrate,
-    temp,
-    pres):
+    temp=293.15,
+    pres=101325.0):
     """
     Calculate Reynolds number in a tube
 
@@ -1335,11 +1319,11 @@ def pipe_reynolds(
 
     tube_diam : float or series of length m
         Inner diameter of the tube (m)
-    flowrate : float opr series of lenght n
+    flowrate : float or series of lenght n
         Volumetric flow rate (lpm)
-    temp : float
+    temp : float or series of length n
         Temperature in K
-    pres : float
+    pres : float or series of length n
         Pressure in Pa
 
     Returns
@@ -1350,24 +1334,31 @@ def pipe_reynolds(
 
     """
 
-    float_input = is_input_float([tube_diam,flowrate])
+    float_input = is_input_float([tube_diam,flowrate,temp,pres])
 
     tube_diam = pd.Series(tube_diam)
     flowrate = pd.Series(flowrate)
+    temp = pd.Series(temp)
+    pres = pd.Series(pres)
+
+    idx = get_index([flowrate,temp,pres]) 
 
     tube_diam = tube_diam.values
     flowrate = flowrate.values.reshape(-1,1)
          
     volu_flow = flowrate/60000.
-    visc = air_viscosity(temp) # float
-    dens = air_density(temp,pres) # float
+    visc = air_viscosity(temp)
+    dens = air_density(temp,pres)
+
+    visc = visc.values.reshape(-1,1)
+    dens = dens.values.reshape(-1,1)
 
     Re = (dens*volu_flow*tube_diam)/(visc*np.pi*(tube_diam/2.0)**2)
 
     if float_input:
         return Re[0][0]
     else:
-        return pd.DataFrame(index = flowrate.flatten(), columns=tube_diam, data=Re)
+        return pd.DataFrame(index = idx, columns=tube_diam, data=Re)
 
 def thab_dp2volts(thab_voltage,dp):
     """
@@ -1787,36 +1778,78 @@ def dma_mob2volts(Q,R1,R2,L,Z):
 
 
 
+def tubeloss_turbulent(diam, flowrate, tube_length, tube_diam, temp=293.15, pres=101325.):
+    """
+    Calculate particle losses to walls of a straight cylindrical 
+    tube assuming a turbulent flow regime and air as the carrier gas.
 
+    Parameters
+    ----------
+    
+    diam : float or series of length m
+        Particle diameters for which to calculate the
+        losses, unit: m
+    flowrate : float or series of length n
+        unit: L/min
+    tube_length : float
+        Length of the cylindrical tube
+        unit: m
+    tube_diam : float
+        Diameter of the cylindrical tube
+        unit: m
+    temp : float or series of length n
+        temperature
+        unit: K
+    pres : float or series of lenght n
+        air pressure
+        unit: Pa
 
+    Returns
+    -------
 
+    float or dataframe of shape (n,m)
+        Fraction of particles passing through.
+        Each column represents diameter and each
+        each row represents different temperature
+        pressure and flowrate value
 
+    """
+    
+    float_input=is_input_float([diam,flowrate,temp,pres])
 
+    temp=pd.Series(temp)
+    pres=pd.Series(pres)
+    diam=pd.Series(diam)
+    flowrate = pd.Series(flowrate)*1.667e-5
 
+    idx = get_index([temp,pres,flowrate])
+    
+    # Average flow velocity
+    flow_velo = flow_velocity_in_pipe(tube_diam, flowrate) # shape: (len(flowrate),len(tube_diam)) or float
+    flow_velo = flow_velo.values.flatten()
 
+    # Reynolds number
+    Re = pipe_reynolds(tube_diam, flowrate, temp, pres) # shape: (maxlen(flowrate,temp,pres),len(tube_diam)) or float
+    Re = Re.values.flatten()
 
+    # Particle diffusivity
+    D = particle_diffusivity(diam,temp,pres) # shape: (maxlen(temp,pres),len(diam)) or float
+    D = D.values
 
+    # Air density
+    air_dens = air_density(temp,pres) # shape: maxlen(temp,pres) or float
+    air_dens = air_dens.values.flatten()
 
+    # Air viscosity
+    air_visc = air_viscosity(temp) # shape: len(temp) or float
+    air_visc = air_visc.values.flatten()
 
+    # Diffusive deposition velocity
+    V_d = ((0.04*flow_velo)/(Re**(1/4.)))*((air_dens*D)/(air_visc))**(2/3.)
 
+    penetration = np.exp(-(4*V_d*tube_length)/(tube_diam * flow_velo))
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+    if float_input:
+        return penetration[0][0]
+    else:
+        return pd.DataFrame(index=idx,columns=diam.values,data=penetration)
