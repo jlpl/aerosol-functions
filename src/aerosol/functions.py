@@ -41,6 +41,9 @@ def get_index(args):
     longest_series = max(args,key=len)
     return longest_series.index
 
+def check_lengths(series_list):
+    lengths = [len(series) for series in series_list if len(series) > 1]
+    return all(length == lengths[0] for length in lengths)
 
 
 
@@ -68,6 +71,8 @@ def air_density(temp,pres):
 
     pres = pd.Series(pres)
     temp = pd.Series(temp)
+
+    assert check_lengths([pres,temp]), "length mismatch"
 
     idx = get_index([temp,pres])
 
@@ -224,6 +229,8 @@ def mean_free_path(temp,pres):
     pres = pd.Series(pres)
     temp = pd.Series(temp)
 
+    assert check_lengths([pres,temp]), "length mismatch"
+
     idx = get_index([temp,pres])
 
     Mair=0.02897
@@ -271,6 +278,8 @@ def slipcorr(dp,temp,pres):
     dp = pd.Series(dp)
     temp = pd.Series(temp)
     pres = pd.Series(pres)
+
+    assert check_lengths([pres,temp]), "length mismatch"
 
     idx = get_index([temp,pres])
 
@@ -1511,30 +1520,27 @@ def utc2solar(utc_time,lon,lat):
     return solar_time
 
 
-def ions2particles(neg_ions,pos_ions,temp=293.15,mob_ratio=None):
+def ions2particles(neg_ions,pos_ions,temp=293.15,mob_ratio=1.0):
     """
     Estimate particle number size distribution from ions using Li et al. (2022)
 
     Parameters
     ----------
 
-    neg_ions : pandas dataframe
+    neg_ions : pandas dataframe of shape (n,m)
         negative ion number size distribution
-    pos_ions : pandas dataframr
+    pos_ions : pandas dataframe of shape (n,m)
         positive ion number size distribution
-    temp : float or series
+    temp : float or series of length n
         ambient temperature in K
     mob_ratio : float
-        mobility ratio to be used, if `None` it is 
-        calculated from the ion data
-
-        Note that the ions should be overwhelmingly
-        singly charged for the calculation to be accurate.
+        mobility ratio to be used
+        default 1.0
     
     Returns
     -------
 
-    pandas dataframe shape=(n,m)
+    pandas dataframe of shape (n,m)
         estimated particle number size distribution
 
     References
@@ -1548,18 +1554,6 @@ def ions2particles(neg_ions,pos_ions,temp=293.15,mob_ratio=None):
     particles = neg_ions.copy()*np.nan
 
     dp = neg_ions.columns.values.astype(float)
-
-    # Calculate mobility ratio matrix (t,dp) -> x 
-    if mob_ratio is None:
-        pos_ions_mod=pos_ions.copy()
-        neg_ions_mod=neg_ions.copy()
-
-        pos_ions_mod[pos_ions_mod<=0]=np.nan
-        neg_ions_mod[neg_ions_mod<=0]=np.nan
-
-        mob_ratio = np.exp(np.log(pos_ions_mod/neg_ions_mod)/2.0).values
-    else:
-        mob_ratio = np.ones((neg_ions.shape[0],neg_ions.shape[1]))
 
     # Calculate the alpha matrix (q,dp) -> alpha
     alpha = np.ones((5,neg_ions.shape[1]))
@@ -1578,7 +1572,7 @@ def ions2particles(neg_ions,pos_ions,temp=293.15,mob_ratio=None):
     # For each measurement time calculate the particle number size distribution
     for i in range(neg_ions.shape[0]):
 
-        x = mob_ratio[i,:]
+        x = mob_ratio
         T = temp.values[i]
             
         # Calculate the positive and negative charge fractions
