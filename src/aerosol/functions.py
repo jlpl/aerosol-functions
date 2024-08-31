@@ -243,7 +243,7 @@ def mean_free_path(temp,pres):
     else:
         return pd.Series(index=idx,data=l)
 
-def slipcorr(dp,temp,pres):
+def slipcorr(dp,temp=293.15,pres=101325.):
     """
     Slip correction factor in air 
 
@@ -292,7 +292,7 @@ def slipcorr(dp,temp,pres):
     else:
         return pd.DataFrame(index = idx, columns = dp, data = cc)
 
-def particle_diffusivity(dp,temp,pres):
+def particle_diffusivity(dp,temp=293.15,pres=101325.):
     """ 
     Particle brownian diffusivity in air 
 
@@ -380,7 +380,7 @@ def particle_thermal_speed(dp,temp):
     else:
         return pd.DataFrame(index = idx, columns = dp, data = vp)
 
-def particle_mean_free_path(dp,temp,pres):
+def particle_mean_free_path(dp,temp=293.15,pres=101325.):
     """ 
     Particle mean free path in air 
 
@@ -486,7 +486,7 @@ def coagulation_coef(dp1,dp2,temp=293.15,pres=101325.):
         return pd.DataFrame(index = idx, columns=dp2, data=coag_coef)
 
 
-def calc_coags(df,dp,temp,pres,dp_start=None):
+def calc_coags(df,dp,temp=293.15,pres=101325.,dp_start=None):
     """ 
     Calculate coagulation sink
 
@@ -772,7 +772,7 @@ def beta(dp,temp,pres,diffusivity,molar_mass):
         return pd.DataFrame(index=idx,columns=dp,data=b)
 
 
-def calc_cs(df,temp,pres):
+def calc_cs(df,temp=293.15,pres=101325.):
     """
     Calculate condensation sink, assuming that the condensing gas is sulfuric acid in air
     with aerosol particles.
@@ -885,8 +885,8 @@ def calc_formation_rate(
     dp1,
     dp2,
     gr,
-    temp,
-    pres):
+    temp=293.15,
+    pres=101325.):
     """
     Calculate particle formation rate
     
@@ -966,8 +966,8 @@ def calc_ion_formation_rate(
     dp2,
     gr_negions,
     gr_posions,
-    temp,
-    pres):
+    temp=293.15,
+    pres=101325.):
     """ 
     Calculate ion formation rate
     

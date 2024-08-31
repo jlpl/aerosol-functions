@@ -8,7 +8,7 @@ from datetime import datetime, timedelta
 from scipy.optimize import minimize
 
 
-def set_legend_outside(ax,handles=None,labels=None,fs=10):
+def set_legend_outside(ax,handles=None,labels=None,coords=(1,1),**kwargs):
     """
     Put legend outside axes (upper right corner)
 
@@ -24,8 +24,11 @@ def set_legend_outside(ax,handles=None,labels=None,fs=10):
     labels : list of strings
         labels for the legend entries
 
-    fs : int
-        font size
+    coords : tuple of floats or ints
+        anchor point for the legend
+
+    kwargs : 
+        other parameters passed to legend  
 
     Returns
     -------
@@ -38,34 +41,34 @@ def set_legend_outside(ax,handles=None,labels=None,fs=10):
         leg = ax.legend(
             handles,
             labels,
-            bbox_to_anchor=(1, 1), 
+            bbox_to_anchor=coords, 
             loc='upper left',
             borderaxespad=0,
-            fontsize=fs,
-            frameon=False)
+            frameon=False,
+            **kwargs)
     elif handles is not None:
         leg = ax.legend(
             handles=handles,
-            bbox_to_anchor=(1, 1), 
+            bbox_to_anchor=coords, 
             loc='upper left',
             borderaxespad=0,
-            fontsize=fs,
-            frameon=False)
+            frameon=False,
+            **kwargs)
     elif labels is not None:
         leg = ax.legend(
             labels,
-            bbox_to_anchor=(1, 1), 
+            bbox_to_anchor=coords, 
             loc='upper left',
             borderaxespad=0,
-            fontsize=fs,
-            frameon=False)
+            frameon=False,
+            **kwargs)
     else:
         leg = ax.legend(
-            bbox_to_anchor=(1, 1), 
+            bbox_to_anchor=coords, 
             loc='upper left',
             borderaxespad=0,
-            fontsize=fs,
-            frameon=False)
+            frameon=False,
+            **kwargs)
 
     return leg
 
@@ -192,8 +195,9 @@ def generate_log_ticks(min_exp,max_exp):
 def subplot_aerosol_dist(
     vlist,
     grid,
-    cmap=cm.rainbow,
-    norm=colors.Normalize(10,10000),
+    norm="log",
+    vmin=10,
+    vmax=10000,
     xminortick_interval="1H",
     xmajortick_interval="2H",
     xticklabel_format="%H:%M",
@@ -216,11 +220,13 @@ def subplot_aerosol_dist(
         Aerosol size distributions (continuous index)    
     grid : tuple (rows,columns)
         define number of rows and columns
-    cmap :  matplotlib colormap
-        Colormap to use, default is rainbow    
-    norm : matplotlib.colors norm
+    norm : string
         Define how to normalize the colors.
-        Default is linear normalization
+        "linear" or "log"
+    vmin : float or int
+        Minimum value in colorbar
+    vmax : float or int
+        Maximum value in colorbar
     xminortick_interval : str
         A pandas date frequency string.
         See for all options here: 
@@ -251,12 +257,25 @@ def subplot_aerosol_dist(
     
     figure object
     array of axes objects
+    list of image handles
     colorbar handle
      
     """
      
     assert isinstance(vlist,list)
-    
+
+    allowed_norm_values = ["linear", "log"]
+
+    if norm not in allowed_norm_values:
+        raise ValueError(f"Invalid input: {norm}. Expected one of {allowed_norm_values}.")
+
+    if norm=="linear":
+        norm = colors.Normalize(vmin,vmax)
+    if norm=="log":
+        norm = colors.LogNorm(vmin,vmax)
+
+    cmap = cm.turbo
+
     rows = grid[0]
     columns = grid[1]
     fig,ax = plt.subplots(rows,columns)
@@ -267,6 +286,9 @@ def subplot_aerosol_dist(
 
     ax_row = ax.flatten() # indices go row first
     ax_col = ax.T.flatten() # indices go column first
+
+    # image handles
+    imgs = []
 
     # Assert some limits regarding grid and plots
     if (rows==1) | (columns==1):
@@ -313,6 +335,7 @@ def subplot_aerosol_dist(
                 extent=(t1,t2,dp1,dp2),
                 **kwargs
             )
+            imgs.append(img)
         else:
             vi = vlist[i-columns]
             if fill_order=="column":
@@ -375,13 +398,14 @@ def subplot_aerosol_dist(
     c_handle = plt.axes([origin[0] + size[0] + xspace, origin[1], 0.02, size[1]])
     cbar = plt.colorbar(img,cax=c_handle)
 
-    return fig,ax_row,cbar
+    return fig,ax_row,imgs,cbar
 
 def plot_aerosol_dist(
     v,
     ax,
-    cmap=cm.rainbow,
-    norm=colors.Normalize(10,10000),
+    norm="log",
+    vmin=10,
+    vmax=10000,
     xminortick_interval="1H",
     xmajortick_interval="2H",
     xticklabel_format="%H:%M"):    
@@ -395,11 +419,13 @@ def plot_aerosol_dist(
         Aerosol number size distribution (continuous index)
     ax : axes object
         axis on which to plot the data
-    cmap :  matplotlib colormap
-        Colormap to use, default is rainbow    
-    norm : matplotlib.colors norm
+    norm : string
         Define how to normalize the colors.
-        Default is linear normalization
+        "linear" or "log"
+    vmin : float or int
+        Minimum value in colorbar
+    vmax : float or int
+        Maximum value in colorbar
     xminortick_interval : pandas date frequency string
         See for all options here: 
         https://pandas.pydata.org/pandas-docs/stable/user_guide/timeseries.html#offset-aliases
@@ -411,6 +437,7 @@ def plot_aerosol_dist(
     Returns
     -------
 
+    image handle
     colorbar handle
      
     """
@@ -440,11 +467,21 @@ def plot_aerosol_dist(
     dp1=np.log10(dp.min())
     dp2=np.log10(dp.max())
 
+    allowed_norm_values = ["linear", "log"]
+
+    if norm not in allowed_norm_values:
+        raise ValueError(f"Invalid input: {norm}. Expected one of {allowed_norm_values}.")
+
+    if norm=="linear":
+        norm = colors.Normalize(vmin,vmax)
+    if norm=="log":
+        norm = colors.LogNorm(vmin,vmax)
+
     img = handle.imshow(
         np.flipud(dndlogdp.T),
         origin="upper",
         aspect="auto",
-        cmap=cmap,
+        cmap=cm.turbo,
         norm=norm,
         extent=(t1,t2,dp1,dp2)
     )
@@ -456,4 +493,4 @@ def plot_aerosol_dist(
     cbar = plt.colorbar(img,cax=c_handle)
     cbar.set_label('$dN/dlogD_p$, [cm$^{-3}$]')
 
-    return cbar
+    return img, cbar
