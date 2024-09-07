@@ -602,7 +602,7 @@ def diam2mob(dp,temp=293.15,pres=101325.0,ne=1):
         default 1 atm 
         unit: Pa
     ne : int
-        number of charges on the aerosol particle
+        number and polarity of charges on the aerosol particle
         default 1
 
     Returns
@@ -638,7 +638,7 @@ def mob2diam(Zp,temp=293.15,pres=101325.,ne=1):
         ambient pressure, 
         unit: Pa
     ne : integer
-        number of charges on the aerosol particle
+        number and polarity of elementary charges on the aerosol particle
 
     Returns
     -------
@@ -647,9 +647,12 @@ def mob2diam(Zp,temp=293.15,pres=101325.,ne=1):
         particle diameter, unit: m
     
     """
+    
+    ne = np.abs(ne)
+    Zp = np.abs(Zp)
 
     def minimize_this(dp,Z):
-        return np.abs((diam2mob(dp,temp,pres,ne)-Z))
+        return np.abs(diam2mob(dp,temp,pres,ne)-Z)
 
     # Initial guessing
     if (Zp>0.1):
