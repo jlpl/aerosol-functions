@@ -46,7 +46,6 @@ def check_lengths(series_list):
     return all(length == lengths[0] for length in lengths)
 
 
-
 def air_density(temp,pres):
     """
     Calculate air density
@@ -593,7 +592,7 @@ def diam2mob(dp,temp=293.15,pres=101325.0,ne=1):
 
     dp : float
         particle diameter(s),
-        unit : m
+        unit : nm
     temp : float
         ambient temperature
         default 20 C 
@@ -611,14 +610,14 @@ def diam2mob(dp,temp=293.15,pres=101325.0,ne=1):
 
     float
         particle electrical mobility, 
-        unit: m2 s-1 V-1
+        unit: cm2 s-1 V-1
 
     """
 
-    cc = slipcorr(dp,temp,pres) # float
-    mu = air_viscosity(temp) # float
+    cc = slipcorr(dp*1e-9,temp,pres) # dataframe
+    mu = air_viscosity(temp) # series
 
-    Zp = (ne*E*cc)/(3.*np.pi*mu*dp)
+    Zp = (ne*E*cc)/(3.*np.pi*mu*dp*1e-9)*1e4
 
     return Zp
 
@@ -631,7 +630,7 @@ def mob2diam(Zp,temp=293.15,pres=101325.,ne=1):
 
     Zp : float
         particle electrical mobility or mobilities, 
-        unit: m2 s-1 V-1
+        unit: cm2 s-1 V-1
     temp : float
         ambient temperature, 
         unit: K
@@ -650,13 +649,34 @@ def mob2diam(Zp,temp=293.15,pres=101325.,ne=1):
     """
 
     def minimize_this(dp,Z):
-        return np.abs(diam2mob(dp,temp,pres,ne)-Z)
+        return np.abs((diam2mob(dp,temp,pres,ne)-Z))
 
-    dp0 = 0.0001
+    # Initial guessing
+    if (Zp>0.1):
+        dp0=1.0
+    elif (Zp>0.001):
+        dp0=10.0
+    elif (Zp>=0.001):
+        dp0=50.0
+    elif (Zp>=0.0001):
+        dp0=150.0
+    elif (Zp>=0.00001):
+        dp0=1000.0
+    else:
+        dp0=10000.0
 
-    diam = minimize(minimize_this, dp0, args=(Zp,), tol=1e-20, method='Nelder-Mead').x[0]
-            
-    return diam
+    # Optimization using Nelder Mead method
+    diam = minimize(minimize_this, 
+        dp0, 
+        args=(Zp,), 
+        tol=1e-3, 
+        method='Nelder-Mead',
+        options={"maxiter":20})
+
+    if not diam.success:
+        return np.nan
+    else:
+        return diam.x[0]
 
 
 def binary_diffusivity(temp,pres,Ma,Mb,Va,Vb):
@@ -1131,6 +1151,7 @@ def tubeloss(diam, flowrate, tubelength, temp=293.15, pres=101325.):
         return penetration[0][0]
     else:
         return pd.DataFrame(index=idx,columns=diam.values,data=penetration)
+
 
 
 def surf_dist(df):
