@@ -8,6 +8,43 @@ from datetime import datetime, timedelta
 from scipy.optimize import minimize
 
 
+def plot_one_to_one_line(ax=None, color='black', linestyle='--', linewidth=1):
+    """
+    Draws a one-to-one line (y = x) on the visible part of the plot.
+    
+    Parameters
+    ----------
+
+    ax : matplotlib.axes.Axes (optional)
+        The axes to draw the line on. If `None`, uses current axes.
+    color : str
+        Color of the line.
+    linestyle : str 
+        Style of the line (e.g., `'--'` for dashed)
+    linewidth : float 
+        Width of the line
+
+    """
+
+    if ax is None:
+        ax = plt.gca()
+    
+    # Get current axis limits
+    xmin, xmax = ax.get_xlim()
+    ymin, ymax = ax.get_ylim()
+
+    # Define the range for the one-to-one line
+    line_min = max(xmin, ymin)
+    line_max = min(xmax, ymax)
+    
+    # Plot the one-to-one line
+    ax.plot([line_min, line_max], [line_min, line_max], color=color, linestyle=linestyle, linewidth=linewidth)
+
+    # Reset limits to ensure they don't change after plotting the line
+    ax.set_xlim(xmin, xmax)
+    ax.set_ylim(ymin, ymax)
+
+
 def set_legend_outside(ax,handles=None,labels=None,coords=(1,1),**kwargs):
     """
     Put legend outside axes (upper right corner)

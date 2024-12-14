@@ -1,6 +1,5 @@
 """
-Aerosol number-size distribution is assumed 
-to be a pandas DataFrame where
+Aerosol number-size distribution is assumed to be a pandas DataFrame where
 
 index: 
     time, pandas.DatetimeIndex
@@ -8,7 +7,6 @@ columns:
     size bin diameters in meters, float
 values: 
     normalized concentration dN/dlogDp in cm-3, float
-
 
 """
 
@@ -146,8 +144,8 @@ def calc_bin_edges(dp):
         log bin edges
 
     """
-    dp = dp.values
-    logdp_mid = np.log10(dp)
+    dp_arr = dp.values
+    logdp_mid = np.log10(dp_arr)
     logdp = (logdp_mid[:-1]+logdp_mid[1:])/2.0
     maxval = [logdp_mid.max()+(logdp_mid.max()-logdp.max())]
     minval = [logdp_mid.min()-(logdp.min()-logdp_mid.min())]
@@ -187,13 +185,13 @@ def air_viscosity(temp):
     Parameters
     ----------
 
-    temp : float or series
+    temp : float or series of length n
         air temperature, unit: K  
 
     Returns
     -------
 
-    float or series
+    float or series of length n
         viscosity of air, unit: m2 s-1  
 
     """
@@ -314,7 +312,7 @@ def particle_diffusivity(dp,temp=293.15,pres=101325.):
 
     """
 
-    float_input=is_input_float([dp,temp,pres])
+    float_input = is_input_float([dp,temp,pres])
 
     dp = pd.Series(dp)
     temp = pd.Series(temp)
@@ -322,15 +320,15 @@ def particle_diffusivity(dp,temp=293.15,pres=101325.):
 
     idx = get_index([temp,pres])
 
-    cc=slipcorr(dp,temp,pres)
-    mu=air_viscosity(temp)
+    cc = slipcorr(dp,temp,pres)
+    mu = air_viscosity(temp)
 
-    cc=cc.values
-    dp=dp.values
-    temp=temp.values.reshape(-1,1)
-    mu=mu.values.reshape(-1,1)
+    cc = cc.values
+    dp = dp.values
+    temp = temp.values.reshape(-1,1)
+    mu = mu.values.reshape(-1,1)
 
-    D=(K_B*temp*cc)/(3.*np.pi*mu*dp) 
+    D = (K_B*temp*cc)/(3.*np.pi*mu*dp) 
 
     if float_input:
         return D[0][0]
@@ -358,19 +356,19 @@ def particle_thermal_speed(dp,temp):
 
     """
 
-    float_input=is_input_float([dp,temp])
+    float_input = is_input_float([dp,temp])
 
     dp = pd.Series(dp)
     temp = pd.Series(temp)
 
     idx = temp.index
 
-    rho_p=1000.0
-    mp=rho_p*(1./6.)*np.pi*dp**3.
+    rho_p = 1000.0
+    mp = rho_p*(1./6.)*np.pi*dp**3.
 
-    dp=dp.values
-    mp=mp.values
-    temp=temp.values.reshape(-1,1)
+    dp = dp.values
+    mp = mp.values
+    temp = temp.values.reshape(-1,1)
 
     vp=((8.*K_B*temp)/(np.pi*mp))**(1./2.)
 
@@ -453,10 +451,10 @@ def coagulation_coef(dp1,dp2,temp=293.15,pres=101325.):
     float_input = is_input_float([dp2,temp,pres])
 
     # Convert everything to series for the calculations
-    dp1=pd.Series(dp1)
-    dp2=pd.Series(dp2)
-    temp=pd.Series(temp)
-    pres=pd.Series(pres)
+    dp1 = pd.Series(dp1)
+    dp2 = pd.Series(dp2)
+    temp = pd.Series(temp)
+    pres = pd.Series(pres)
 
     idx = get_index([temp,pres])
 
@@ -472,8 +470,8 @@ def coagulation_coef(dp1,dp2,temp=293.15,pres=101325.):
     c1 = particle_thermal_speed(dp1,temp).values
     c2 = particle_thermal_speed(dp2,temp).values
 
-    dp1=dp1.values
-    dp2=dp2.values
+    dp1 = dp1.values
+    dp2 = dp2.values
 
     coag_coef = 2.*np.pi*(D1+D2)*(dp1+dp2) \
            * 1./( (dp1+dp2)/(dp1+dp2+2.*(g1**2.+g2**2.)**0.5) + \
@@ -621,7 +619,7 @@ def diam2mob(dp,temp=293.15,pres=101325.0,ne=1):
 
     return Zp
 
-def mob2diam(Zp,temp=293.15,pres=101325.,ne=1):
+def mob2diam(Zp,temp=293.15,pres=101325.,ne=1, tol=1e-3, maxiter=20):
     """
     Convert electrical mobility to electrical mobility diameter in air
 
@@ -672,9 +670,9 @@ def mob2diam(Zp,temp=293.15,pres=101325.,ne=1):
     diam = minimize(minimize_this, 
         dp0, 
         args=(Zp,), 
-        tol=1e-3, 
+        tol=tol, 
         method='Nelder-Mead',
-        options={"maxiter":20})
+        options={"maxiter":maxiter})
 
     if not diam.success:
         return np.nan
@@ -857,8 +855,8 @@ def calc_cs(df,temp=293.15,pres=101325.):
 
 def calc_conc(df,dmin,dmax,frac=0.5):
     """
-    Calculate particle number concentration from aerosol 
-    number-size distribution
+    Calculate particle number concentration from aerosol
+    number-size distribution by adding whole bins
 
     Parameters
     ----------
@@ -874,7 +872,7 @@ def calc_conc(df,dmin,dmax,frac=0.5):
 
     Returns
     -------
-    
+
     dataframe
         Number concentration in the given size range(s), unit: cm-3
 
@@ -900,6 +898,70 @@ def calc_conc(df,dmin,dmax,frac=0.5):
             conc = (conc*dlogdp).sum(axis=1, min_count=int(frac*len(findex)))
 
         conc_df.insert(i,i,conc)
+
+    return conc_df
+
+
+def calc_conc_interp(df,dmin,dmax):
+    """
+    Calculate particle number concentration from aerosol
+    number-size distribution by interpolating between bins 
+
+    Parameters
+    ----------
+
+    df : dataframe
+        Aerosol number-size distribution
+    dmin : float or series of length n
+        Size range lower diameter(s), unit: m
+    dmax : float or series of length n
+        Size range upper diameter(s), unit: m
+
+    Returns
+    -------
+
+    dataframe
+        Number concentration in the given size range(s), unit: cm-3
+
+    """
+
+    dmin = pd.Series(dmin)
+    dmax = pd.Series(dmax)
+
+    dp = df.columns.values.astype(float)
+
+    # Create dense diameter grid
+    dp_grid = np.logspace(np.log10(dp).min(),np.log10(dp).max(),1000)
+
+    # Interpolate to dense diameter grid
+    df_interp = df.reindex(
+        dp_grid,
+        axis=1,
+        method="nearest",
+        tolerance=dp_grid[1]-dp_grid[0]).interpolate(
+            axis=1,
+            limit_area="inside",
+            method="linear").dropna(
+                axis=1,
+                how="all")
+
+    # Update the diameter grid
+    dp_grid = df_interp.columns.values.astype(float)
+
+    # Calculate bin widths in log scale 
+    dlogdp_grid = np.diff(calc_bin_edges(pd.Series(dp_grid)))
+
+    # Transform dN/dlogDp -> dN
+    dn_interp = df_interp * dlogdp_grid
+
+    conc_df = pd.DataFrame(index = df.index, columns = np.arange(len(dmin)))
+
+    for i in range(len(dmin)):
+        dp1 = np.max([dp_grid.min(), dmin.values[i]])
+        dp2 = np.min([dp_grid.max(), dmax.values[i]])
+        findex = np.argwhere((dp_grid<dp2)&(dp_grid>=dp1)).flatten()
+        conc = dn_interp.iloc[:,findex].sum(axis=1,min_count=1)
+        conc_df.iloc[:,i] = conc
 
     return conc_df
 
@@ -1403,7 +1465,7 @@ def thab_dp2volts(thab_voltage,dp):
     thab_voltage : float
         Voltage at THA+ peak (V)
     dp : float or series
-        Particle diameters (m)
+        Particle diameters (nm)
 
     Returns
     -------
@@ -1424,7 +1486,7 @@ def thab_dp2volts(thab_voltage,dp):
 
     """
 
-    thab_mob = (1.0/1.03)*1e-4
+    thab_mob = (1.0/1.03)
         
     Zp = diam2mob(dp,293.15,101325.0,1)
    
@@ -1447,7 +1509,7 @@ def thab_volts2dp(thab_voltage,dma_voltage):
     -------
 
     float:
-        particle diameter corresponding to DMA voltage (m)
+        particle diameter corresponding to DMA voltage (nm)
 
     Notes
     -----
@@ -1462,7 +1524,7 @@ def thab_volts2dp(thab_voltage,dma_voltage):
 
     """
 
-    thab_mob = (1.0/1.03)*1e-4
+    thab_mob = (1.0/1.03)
         
     Zp = (thab_voltage*thab_mob)/dma_voltage
 
@@ -1470,6 +1532,18 @@ def thab_volts2dp(thab_voltage,dma_voltage):
     
     return dp
 
+#def psl_volts2dp(psl_dp, psl_voltage, dma_voltage):
+#    """
+#    """
+#    return (dma_voltage * psl_dp)/psl_voltage
+#
+#def psl_dp2volts(psl_dp, psl_voltage, dp):
+#    """
+#    """
+#    return (dp * psl_voltage)/psl_dp
+#    
+#
+#def psl_volts2dp():
 
 def eq_charge_frac(dp,N):
     """
@@ -1755,11 +1829,11 @@ def dma_volts2mob(Q,R1,R2,L,V):
     -------
 
     float or series
-        selected mobility, unit m2 s-1 V-1
+        selected mobility, unit cm2 s-1 V-1
 
     """
 
-    return ((Q*1.667e-5)*np.log(R2/R1))/(2.*np.pi*L*V)
+    return ((Q*1.667e-5)*np.log(R2/R1))/(2.*np.pi*L*V)*1e4
 
 def dma_mob2volts(Q,R1,R2,L,Z):
     """
@@ -1781,7 +1855,7 @@ def dma_mob2volts(Q,R1,R2,L,Z):
         effective electrode length, unit m
 
     Z : float
-        mobility, unit m2 s-1 V-1
+        mobility, unit cm2 s-1 V-1
 
     Returns
     -------
@@ -1791,7 +1865,7 @@ def dma_mob2volts(Q,R1,R2,L,Z):
 
     """
 
-    return ((Q*1.667e-5)*np.log(R2/R1))/(2.*np.pi*L*Z)
+    return ((Q*1.667e-5)*np.log(R2/R1))/(2.*np.pi*L*Z*1e-4)
 
 
 
