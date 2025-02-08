@@ -441,10 +441,9 @@ def plot_aerosol_dist(
     v,
     ax,
     norm="log",
-    vmin=10,
-    vmax=10000,
-    xminortick_interval="1H",
-    xmajortick_interval="2H",
+    clim=None,
+    xminortick_interval="1h",
+    xmajortick_interval="2h",
     xticklabel_format="%H:%M"):    
     """ 
     Plot aerosol particle number-size distribution surface plot
@@ -459,10 +458,8 @@ def plot_aerosol_dist(
     norm : string
         Define how to normalize the colors.
         "linear" or "log"
-    vmin : float or int
-        Minimum value in colorbar
-    vmax : float or int
-        Maximum value in colorbar
+    clim : list with two elements or None
+        Minimum and maximum value in colorbar, None calculates automatic limits
     xminortick_interval : pandas date frequency string
         See for all options here: 
         https://pandas.pydata.org/pandas-docs/stable/user_guide/timeseries.html#offset-aliases
@@ -509,10 +506,13 @@ def plot_aerosol_dist(
     if norm not in allowed_norm_values:
         raise ValueError(f"Invalid input: {norm}. Expected one of {allowed_norm_values}.")
 
+    if clim is None:
+        clim = np.nanpercentile(dndlogdp,[5,95])
+
     if norm=="linear":
-        norm = colors.Normalize(vmin,vmax)
+        norm = colors.Normalize(clim[0],clim[1])
     if norm=="log":
-        norm = colors.LogNorm(vmin,vmax)
+        norm = colors.LogNorm(clim[0],clim[1])
 
     img = handle.imshow(
         np.flipud(dndlogdp.T),

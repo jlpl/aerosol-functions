@@ -12,3 +12,9 @@ aerosol.plotting module
 
 .. automodule:: aerosol.plotting
    :members:
+
+aerosol.fitting module
+------------------------
+
+.. automodule:: aerosol.fitting
+   :members:

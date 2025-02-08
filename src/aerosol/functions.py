@@ -1217,8 +1217,6 @@ def tubeloss(diam, flowrate, tubelength, temp=293.15, pres=101325.):
     else:
         return pd.DataFrame(index=idx,columns=diam.values,data=penetration)
 
-
-
 def surf_dist(df):
     """
     Calculate the aerosol surface area size distribution
@@ -1869,6 +1867,52 @@ def dma_mob2volts(Q,R1,R2,L,Z):
 
 
 
+def conical_dma_mob2volts(Q, R1_max, R2, L, alpha, Z):
+    """
+    Conical DMA voltage corresponding to mobility
+
+    Parameters
+    ----------
+
+    Q : float
+        sheath flow rate, unit lpm
+
+    R1_max : float
+        inner electrode radius at outlet at distance L, unit m
+
+    R2 : float
+        outer electrode radius, unit m
+
+    L : float
+        effective electrode length, unit m
+        
+    alpha : float
+        tapering angle, unit degrees
+
+    Z : float
+        mobility, unit cm2 s-1 V-1
+
+    Returns
+    -------
+
+    float
+        DMA voltage, unit V
+
+    """
+
+    # Convert to radians
+    alpha = alpha*(np.pi/180.)
+    
+    # Calculate the geometric factor K_T
+    x = np.linspace(0,L,100)
+    Rx = R1_max - (L-x) * np.tan(alpha)
+    K_T = np.log(R2/R1_max)/L * np.trapz(y = 1./np.log(R2/Rx), x = x)
+    
+    # Calculate the voltage
+    V = ((Q*1.667e-5)*np.log(R2/R1_max))/(2*np.pi*L*(Z*1e-4)*K_T)
+    
+    return V
+
 
 def tubeloss_turbulent(diam, flowrate, tube_length, tube_diam, temp=293.15, pres=101325.):
     """
@@ -1937,7 +1981,10 @@ def tubeloss_turbulent(diam, flowrate, tube_length, tube_diam, temp=293.15, pres
     air_visc = air_visc.values.flatten()
 
     # Diffusive deposition velocity
-    V_d = ((0.04*flow_velo)/(Re**(1/4.)))*((air_dens*D)/(air_visc))**(2/3.)
+    #V_d = ((0.04*flow_velo)/(Re**(1/4.)))*((air_dens*D)/(air_visc))**(2/3.)
+
+    delta = (28.5*tube_diam*D**(1/4.))/(Re**(7/8.)*(air_visc/air_dens)**1/4.) 
+    V_d = D/delta
 
     penetration = np.exp(-(4*V_d*tube_length)/(tube_diam * flow_velo))
 
@@ -1945,3 +1992,35 @@ def tubeloss_turbulent(diam, flowrate, tube_length, tube_diam, temp=293.15, pres
         return penetration[0][0]
     else:
         return pd.DataFrame(index=idx,columns=diam.values,data=penetration)
+
+def sample_from_dist(x,y,n):
+    """
+    Draw n samples from empirical distribution defined by points (x,y)
+
+    Parameters
+    ----------
+
+    x : numpy array
+        x-data points
+
+    y: numpy array
+        y-data points
+
+    n : int
+        number of samples to draw
+
+    Returns
+    -------
+
+    numpy array
+        samples drawn
+
+    """
+
+    dist = y/np.sum(y)
+    cdf = np.cumsum(dist)
+    cdf = cdf / cdf[-1]
+    random_values = np.random.rand(n)
+    samples = np.interp(random_values, cdf, x)
+
+    return samples

@@ -5,7 +5,7 @@ with open("README.md","r") as fh:
 
 setup(
     name = "aerosol-functions",
-    version = "0.1.5",
+    version = "0.1.6",
     description = 'Functions to analyze atmospheric aerosol data',
     package_dir = {'':'src'},
     packages = ['aerosol'],
@@ -24,6 +24,8 @@ setup(
         "scipy >= 1.5.3",
         "bokeh >= 2.4.3",
         "astral >= 3.2",
+        "kneed >= 0.8.5",
+        "scikit-learn >= 1.3.0"
     ],
     url = "https://github.com/jlpl/aerosol-functions",
     author = "Janne Lampilahti",
