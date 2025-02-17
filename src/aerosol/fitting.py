@@ -345,7 +345,7 @@ def fit_multimodes(df, n_modes = None, n_samples = 10000):
     Returns
     -------
 
-    `dict`:
+    list:
         List of fit results
 
     """
