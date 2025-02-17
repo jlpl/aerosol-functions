@@ -5,7 +5,7 @@ with open("README.md","r") as fh:
 
 setup(
     name = "aerosol-functions",
-    version = "0.1.6",
+    version = "0.1.7",
     description = 'Functions to analyze atmospheric aerosol data',
     package_dir = {'':'src'},
     packages = ['aerosol'],
@@ -22,7 +22,7 @@ setup(
         "numpy >= 1.19.0",
         "matplotlib >= 3.3.4",
         "scipy >= 1.5.3",
-        "bokeh >= 2.4.3",
+        "bokeh >= 3.6.3",
         "astral >= 3.2",
         "kneed >= 0.8.5",
         "scikit-learn >= 1.3.0"

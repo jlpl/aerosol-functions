@@ -10,6 +10,7 @@ from matplotlib.colors import LogNorm
 import matplotlib.pyplot as plt
 from bokeh.transform import linear_cmap
 from bokeh.models import ColorBar, LogColorMapper
+from bokeh import palettes
 from bokeh.palettes import Turbo256 as palette
 from bokeh.palettes import Category10
 import pandas as pd
@@ -26,10 +27,20 @@ from sklearn.mixture import GaussianMixture
 from kneed import KneeLocator
 from scipy.signal import find_peaks
 from sklearn.neighbors import KernelDensity
-
 from scipy.optimize import curve_fit
-
 from scipy.interpolate import UnivariateSpline
+
+
+### TODO: 
+# Add box select tool
+# Add dropown menu for the colormap 
+#
+# Button 1: Fit all
+# Button 2: Fit selected
+# Button 3: Clear all
+# Button 4: Clear Selected
+# Button 5: Check dist should be on all the time
+
 
 def find_df_in_polygon(data,poly):
     # Return aerosol number size disribution from inside a rectangle 
@@ -78,6 +89,7 @@ def find_df_in_polygon(data,poly):
 
 def fit_modes_method(data):
     global fit_modes_text_input
+    global info_div
 
     num_modes = int(fit_modes_text_input.value)
     tim = data.index.values.astype(float)
@@ -85,34 +97,14 @@ def fit_modes_method(data):
 
     peaks = []
 
+    info_text_updates = ""
+
     for j in range(data.shape[0]):
         conc = data.iloc[j,:].values.flatten()
 
-        # Convert to pandas Series
-        ds = pd.Series(index = dp, data = conc)
-    
-        # Interpolate away the NaN values but do not extrapolate, remove any NaN tails
-        s = ds.interpolate(limit_area="inside").dropna()
-    
-        # Set negative values to zero
-        s[s<0]=0
-    
-        # Recover x and y for fitting
-        x_interp = s.index.values
-        y_interp = s.values
+        res = afi.fit_multimode(dp, conc, "1970-01-01 00:00", n_modes = num_modes)
 
-        # Ensure there is enough data    
-        if ((len(x_interp)<3) & (len(y_interp)<3)):
-            continue
-
-        # Perform mode fit            
-        coef = np.trapz(y_interp,x_interp)
-
-        samples = af.sample_from_dist(x_interp,y_interp,10000)
-
-        res = afi.fit_gmm(samples, num_modes, coef, None, None)
-
-        for r in res: 
+        for r in res["gaussians"]: 
             peak = {
                 "time": tim[j], # milliseconds since epoch
                 "diam": (10**r["mean"])*1e-9, # meters
@@ -122,82 +114,94 @@ def fit_modes_method(data):
             }
 
             peaks.append(peak)
+        
+        time_str = pd.to_datetime(tim[j],unit="ms").strftime("%Y-%m-%d %H:%M:%S")
+        info_text_updates += f"Fitted: {time_str} <br>"
+
+        info_div.text = info_text_updates
 
     return peaks
 
-def fit_maxconc_method(data):
-
-    tim = data.index.values.astype(float)
-    dp = np.log10(data.columns.astype(float).values*1e9)
-
-    peaks = []
-
-    for j in range(data.shape[1]):
-        conc = data.iloc[:,j].values.flatten()
-
-        # Convert to pandas Series
-        ds = pd.Series(index = tim, data = conc)
-    
-        # Interpolate away the NaN values but do not extrapolate, remove any NaN tails
-        s = ds.interpolate(limit_area="inside").dropna()
-    
-        # Set negative values to zero
-        s[s<0]=0
-    
-        # Recover x and y for fitting
-        x_interp = s.index.values
-        y_interp = s.values
-
-        # Ensure there is enough data    
-        if ((len(x_interp)<3) & (len(y_interp)<3)):
-            continue
-
-        # Perform fit
-        coef = np.trapz(y_interp,x_interp)
-
-        samples = af.sample_from_dist(x_interp,y_interp,10000)
-
-        res = afi.fit_gmm(samples, 1, coef, None, None)
-
-        peak = {
-            "time": res[0]["mean"], # milliseconds since epoch
-            "diam": (10**dp[j])*1e-9, # meters
-            "mean": res[0]["mean"],
-            "sigma": res[0]["sigma"], 
-            "amplitude": res[0]["amplitude"]
-        }
-
-        peaks.append(peak)
-
-    return peaks
-
+#def fit_maxconc_method(data):
+#    global info_div
+#
+#    tim = data.index.values.astype(float)
+#    dp = np.log10(data.columns.astype(float).values*1e9)
+#
+#    peaks = []
+#
+#    info_text_updates = ""
+#
+#    for j in range(data.shape[1]):
+#        conc = data.iloc[:,j].values.flatten()
+#
+#        # Convert to pandas Series
+#        ds = pd.Series(index = tim, data = conc)
+#    
+#        # Interpolate away the NaN values but do not extrapolate, remove any NaN tails
+#        s = ds.interpolate(limit_area="inside").dropna()
+#    
+#        # Set negative values to zero
+#        s[s<0]=0
+#    
+#        # Recover x and y for fitting
+#        x_interp = s.index.values
+#        y_interp = s.values
+#
+#        # Ensure there is enough data    
+#        if ((len(x_interp)<3) & (len(y_interp)<3)):
+#            continue
+#
+#        # Perform fit
+#        coef = np.trapz(y_interp,x_interp)
+#
+#        samples = af.sample_from_dist(x_interp,y_interp,10000)
+#
+#        res = afi.fit_gmm(samples, 1, coef, None, None)
+#
+#        peak = {
+#            "time": res[0]["mean"], # milliseconds since epoch
+#            "diam": (10**dp[j])*1e-9, # meters
+#            "mean": res[0]["mean"],
+#            "sigma": res[0]["sigma"], 
+#            "amplitude": res[0]["amplitude"]
+#        }
+#
+#        peaks.append(peak)
+#
+#        dp_str = f"{10**dp[j]:.3f}"
+#        info_text_updates += f"Fitted: {dp_str} nm <br>"
+#
+#        info_div.text = info_text_updates
+#
+#    return peaks
 
 def update_peaks():
     global list_of_polygons
     global selected_polygon_index
     global mode_peaks_source
-    global maxconc_peaks_source
+    #global maxconc_peaks_source
 
     peak_mode_diams = []
     peak_mode_times = []
 
-    peak_maxconc_diams = []
-    peak_maxconc_times = []
+#    peak_maxconc_diams = []
+#    peak_maxconc_times = []
 
     for p in list_of_polygons:
         peak_mode_diams = peak_mode_diams + [params["diam"] for params in p["fit_mode_params"]]
         peak_mode_times = peak_mode_times + [params["time"] for params in p["fit_mode_params"]]
-        peak_maxconc_diams = peak_maxconc_diams + [params["diam"] for params in p["fit_maxconc_params"]]
-        peak_maxconc_times = peak_maxconc_times + [params["time"] for params in p["fit_maxconc_params"]]
+#        peak_maxconc_diams = peak_maxconc_diams + [params["diam"] for params in p["fit_maxconc_params"]]
+#        peak_maxconc_times = peak_maxconc_times + [params["time"] for params in p["fit_maxconc_params"]]
 
     mode_peaks_source.data = {
         "t": peak_mode_times,
         "d": peak_mode_diams
     }
-    maxconc_peaks_source.data = {
-        "t": peak_maxconc_times, 
-        "d": peak_maxconc_diams
-    }
+#    maxconc_peaks_source.data = {
+#        "t": peak_maxconc_times, 
+#        "d": peak_maxconc_diams
+#    }
 
 def do_fit_modes(event):
     # Run this when the fit modes button is pressed
@@ -217,23 +221,47 @@ def do_fit_modes(event):
 
         update_peaks()
 
-def do_fit_maxconc(event):
-    # Run this when the fit maxconc button is pressed
+def do_fit_mode(event):
+    # Run this when the fit modes button is pressed
     global list_of_polygons
     global selected_polygon_index
     global df
+    global dist
 
     if selected_polygon_index is not None:
+        df_subset = dist.copy()
 
         polygon = list_of_polygons[selected_polygon_index]
-        
-        df_subset = find_df_in_polygon(df.copy(),polygon)
-        
-        peaks = fit_maxconc_method(df_subset)
 
-        list_of_polygons[selected_polygon_index]["fit_maxconc_params"] = peaks
+        df_subset.index =  (df_subset.index - pd.Timestamp("1970-01-01")) // pd.Timedelta("1ms")
+
+        # Do the fit to the dist        
+        peaks = fit_modes_method(df_subset)
+
+        # Update inside the selected polygon only the selected dist
+        for p in list_of_polygons[selected_polygon_index]["fit_mode_params"]:
+            if (p["time"]==peaks["time"]):
+                p = peaks
 
         update_peaks()
+
+#def do_fit_maxconc(event):
+#    # Run this when the fit maxconc button is pressed
+#    global list_of_polygons
+#    global selected_polygon_index
+#    global df
+#
+#    if selected_polygon_index is not None:
+#
+#        polygon = list_of_polygons[selected_polygon_index]
+#        
+#        df_subset = find_df_in_polygon(df.copy(),polygon)
+#        
+#        peaks = fit_maxconc_method(df_subset)
+#
+#        list_of_polygons[selected_polygon_index]["fit_maxconc_params"] = peaks
+#
+#        update_peaks()
 
 
 def remove_mode_fits_from_polygon(event):
@@ -250,18 +278,36 @@ def remove_mode_fits_from_polygon(event):
         update_peaks()
 
 
-def remove_maxconc_fits_from_polygon(event):
+def remove_mode_fit_from_polygon(event):
     # a remove mode fits button is pressed
     global list_of_polygons
     global selected_polygon_index
+    global dist
 
     if selected_polygon_index is not None:
+        df_subset = dist.copy()
 
-        # Empty the list containing the fitted parametrs
-        list_of_polygons[selected_polygon_index]["fit_maxconc_params"] = []
-
-        # Remove the points from the plot
+        dist_time =  (dist.index[0] - pd.Timestamp("1970-01-01")) // pd.Timedelta("1ms")
+       
+        for i in range(len(list_of_polygons[selected_polygon_index]["fit_mode_params"])):
+            if (list_of_polygons[selected_polygon_index]["fit_mode_params"][i]["time"]==dist_time):
+                list_of_polygons[selected_polygon_index]["fit_mode_params"][i] = []
+                
+        # Remove the point from the plot
         update_peaks()
+
+#def remove_maxconc_fits_from_polygon(event):
+#    # a remove mode fits button is pressed
+#    global list_of_polygons
+#    global selected_polygon_index
+#
+#    if selected_polygon_index is not None:
+#
+#        # Empty the list containing the fitted parametrs
+#        list_of_polygons[selected_polygon_index]["fit_maxconc_params"] = []
+#
+#        # Remove the points from the plot
+#        update_peaks()
 
 
 def update_selected_polygon(attr, old, new):
@@ -349,7 +395,7 @@ def load_aerosol_file(event):
     global info_div
     global df
     global mode_peaks_source
-    global maxconc_peaks_source
+    #global maxconc_peaks_source
 
     f = aerosol_file_text_input.value 
 
@@ -389,7 +435,7 @@ def load_aerosol_file(event):
 
         # Add the maxconc ploints
         mode_peaks_source.data = {"t":[], "d":[]}
-        maxconc_peaks_source.data = {"t":[], "d":[]}
+        #maxconc_peaks_source.data = {"t":[], "d":[]}
 
         info_div.text = f"Loaded aerosol data from: {f}"
     except:
@@ -453,83 +499,85 @@ def tap_callback(event):
     global mask_source
     global dist_source
     global df
+    global dist
     global is_check_dist
     global list_of_polygons
     global dist_fit_line_renderers
     global fit_line_colors
 
-    if is_check_dist:
-        if df is not None:
+#    if is_check_dist:
+    if df is not None:
 
-            target_datetime = pd.to_datetime(event.x, unit='ms')
+        target_datetime = pd.to_datetime(event.x, unit='ms')
 
-            closest_datetime = df.index[df.index<=target_datetime].max()
+        closest_datetime = df.index[df.index<=target_datetime].max()
 
-            x_data = df.index.values
-            y_data = df.columns.values.astype(float)
-            z_data = df.values.astype(float).T
+        x_data = df.index.values
+        y_data = df.columns.values.astype(float)
+        z_data = df.values.astype(float).T
 
-            closest_index = np.argwhere(df.index==closest_datetime).flatten()
+        closest_index = np.argwhere(df.index==closest_datetime).flatten()
 
-            z_mask = mask_source.data["img"][0]
-            z_mask.fill(0)
-            view = z_mask.view(dtype=np.uint8).reshape((z_mask.shape[0], z_mask.shape[1], 4))
-            view[:,:,:3] = 255
-            view[:,:, 3] = 0
-            view[:,closest_index, 3] = 80 
-             
-            mask_source.data["img"] = [z_mask]
-
-            dist = df.loc[closest_datetime,:]
-            fig_dist.title.text=f'{closest_datetime}'
-            dist_source.data = dict(x=y_data, y=dist.values)
-
-            # remove existing lines if they exist
-            for dist_fit_line_renderer in dist_fit_line_renderers:
-                fig_dist.renderers.remove(dist_fit_line_renderer)
-
-            dist_fit_line_renderers = []
-
-            color_index = 0
-
-            for p in list_of_polygons:
-                for d in p["fit_mode_params"]:
-                    if (pd.to_datetime(d["time"], unit="ms") == closest_datetime):
-                        dist_fit = afi.gaussian(np.log10(y_data*1e9), d["amplitude"], d["mean"], d["sigma"])
-                        renderer = fig_dist.line(
-                            'x',
-                            'y',
-                            source=ColumnDataSource(data=dict(x=y_data,y=dist_fit)),
-                            line_width=1,
-                            color=fit_line_colors[color_index % len(fit_line_colors)]
-                        )
-                        dist_fit_line_renderers.append(renderer)
-                        color_index += 1
-
-
-def toggle_check_dist(event):
-    global is_check_dist
-    global vline
-    global fig_dist
-    global mask_source
-    global check_dist_button
-    global dist_source
-    global dist_fit_source
-
-    if is_check_dist:
         z_mask = mask_source.data["img"][0]
         z_mask.fill(0)
+        view = z_mask.view(dtype=np.uint8).reshape((z_mask.shape[0], z_mask.shape[1], 4))
+        view[:,:,:3] = 255
+        view[:,:, 3] = 0
+        view[:,closest_index, 3] = 80 
+         
         mask_source.data["img"] = [z_mask]
-        
-        dist_source.data = dict(x=[], y=[])
-        #dist_fit_source.data = dict(x=[], y=[])
 
-        fig_dist.title.text=f' '
-        is_check_dist = False
-        check_dist_button.button_type="danger"
-    else:
-        is_check_dist = True
-        check_dist_button.button_type="success"
+        dist = df.loc[closest_datetime,:]
+        fig_dist.title.text=f'{closest_datetime}'
+        dist_source.data = dict(x=y_data, y=dist.values)
+
+        # remove existing lines if they exist
+        for dist_fit_line_renderer in dist_fit_line_renderers:
+            fig_dist.renderers.remove(dist_fit_line_renderer)
+
+        dist_fit_line_renderers = []
+
+        color_index = 0
+
+        # Plot any fits if they exist
+        for p in list_of_polygons:
+            for d in p["fit_mode_params"]:
+                if (pd.to_datetime(d["time"], unit="ms") == closest_datetime):
+                    dist_fit = afi.gaussian(np.log10(y_data*1e9), d["amplitude"], d["mean"], d["sigma"])
+                    renderer = fig_dist.line(
+                        'x',
+                        'y',
+                        source=ColumnDataSource(data=dict(x=y_data,y=dist_fit)),
+                        line_width=1,
+                        color=fit_line_colors[color_index % len(fit_line_colors)]
+                    )
+                    dist_fit_line_renderers.append(renderer)
+                    color_index += 1
+
+
+#def toggle_check_dist(event):
+#    global is_check_dist
+#    global vline
+#    global fig_dist
+#    global mask_source
+#    global check_dist_button
+#    global dist_source
+#    global dist_fit_source
+#
+#    if is_check_dist:
+#        z_mask = mask_source.data["img"][0]
+#        z_mask.fill(0)
+#        mask_source.data["img"] = [z_mask]
+#        
+#        dist_source.data = dict(x=[], y=[])
+#        #dist_fit_source.data = dict(x=[], y=[])
+#
+#        fig_dist.title.text=f' '
+#        is_check_dist = False
+#        check_dist_button.button_type="danger"
+#    else:
+#        is_check_dist = True
+#        check_dist_button.button_type="success"
 
 
 def add_label(event):
@@ -576,6 +624,9 @@ def remove_option(event):
         dropdown.options.remove(add_option_text_input.value)
         add_option_text_input.value = ""
 
+def on_cmap_select(event):
+    #TODO Update to new colormap that was selected
+
 
 def close_app():
     sys.exit()
@@ -584,13 +635,14 @@ def close_app():
 # CLOSE THE APP
 close_js = CustomJS(code="window.close()")
 
-
-
 # Initialize regular global variables
-df = None
+df = None # Holds the full timeseries
+dist = None # Holds the selected distribution
+
 list_of_polygons = []
 selected_polygon_index = None
-is_check_dist = False
+
+#is_check_dist = False # Determines whether to plot the selected dist
 
 # Some dummy data
 zero_image = np.zeros((10, 10))
@@ -611,7 +663,7 @@ polygon_source = ColumnDataSource(data=dict(xs=[], ys=[]))
 polygon_background_source = ColumnDataSource(data=dict(xs=[], ys=[]))
 
 mode_peaks_source = ColumnDataSource(data = dict(t=[], d=[]))
-maxconc_peaks_source = ColumnDataSource(data = dict(t=[], d=[]))
+#maxconc_peaks_source = ColumnDataSource(data = dict(t=[], d=[]))
 
 # Create the surface plot figures
 fig = figure(
@@ -673,8 +725,8 @@ mode_peaks_glyph = Scatter(x="t", y="d", size=15, marker="dot", fill_color="blac
 fig.add_glyph(mode_peaks_source, mode_peaks_glyph)
 
 # Fitted maxconc peaks
-maxconc_peaks_glyph = Scatter(x="t", y="d", size=15, marker="dot", fill_color="black", line_color="black")
-fig.add_glyph(maxconc_peaks_source, maxconc_peaks_glyph)
+#maxconc_peaks_glyph = Scatter(x="t", y="d", size=15, marker="dot", fill_color="black", line_color="black")
+#fig.add_glyph(maxconc_peaks_source, maxconc_peaks_glyph)
 
 # Draw tool for drawing the polygons
 draw_tool = FreehandDrawTool(renderers=[poly_renderer])
@@ -714,15 +766,15 @@ fit_modes_button.on_event(ButtonClick, do_fit_modes)
 remove_modes_button.on_event(ButtonClick, remove_mode_fits_from_polygon)
 
 # Fit maxconc controls
-fit_maxconc_button = Button(label="Fit maxconc", button_type="primary", width=150, height=30)
-
-remove_maxconc_button = Button(label="Clear maxconc fit", button_type="primary", width=150, height=30)
-
-fit_maxconc_button.on_event(ButtonClick, do_fit_maxconc)
-
-remove_maxconc_button.on_event(ButtonClick, remove_maxconc_fits_from_polygon)
-
-button_spacer = Spacer(width=160,height=30)
+#fit_maxconc_button = Button(label="Fit maxconc", button_type="primary", width=150, height=30)
+#
+#remove_maxconc_button = Button(label="Clear maxconc fit", button_type="primary", width=150, height=30)
+#
+#fit_maxconc_button.on_event(ButtonClick, do_fit_maxconc)
+#
+#remove_maxconc_button.on_event(ButtonClick, remove_maxconc_fits_from_polygon)
+#
+#button_spacer = Spacer(width=160,height=30)
 
 # Load the aerosol data
 aerosol_file_button = Button(label="Load aerosol data", button_type="primary",height=30,width=150)
@@ -760,9 +812,9 @@ json_save_text_input = TextInput(placeholder="ROI filepath",height=30,width=310)
 json_save_button.on_event(ButtonClick, save_polygon_data)
 
 # Check individual distribution button
-check_dist_button = Button(label="Show/Hide Distribution", button_type="danger",height=30,width=150)
+#check_dist_button = Button(label="Show/Hide Distribution", button_type="danger",height=30,width=150)
 
-check_dist_button.on_event(ButtonClick, toggle_check_dist)
+#check_dist_button.on_event(ButtonClick, toggle_check_dist)
 
 ## Label ROIs 
 #label_text_input = TextInput(placeholder="ROI label", width=310, height=30)
@@ -771,6 +823,11 @@ check_dist_button.on_event(ButtonClick, toggle_check_dist)
 #
 #label_submit_button.on_event(ButtonClick, add_label)
 
+
+# colormap dropdown
+cmap_dropdown = Select(value = "Turbo", options = ["Turbo","Plasma","Rainbow"], width=230, height=30)
+
+# Implement onSelect()
 
 # Label select
 dropdown = Select(options = [], width=230, height=30)
@@ -816,25 +873,23 @@ title_div = Div(text="Aerosol Size Distribution GUI Tool", width=500, height=80,
         "align-items": "flex-end"
 })
 
-#logo_div = Div(
-#    text="""
-#    <img src="https://jlpl.github.io/aerosol-functions/logo.png" alt="Logo" style="width: auto; height: 80px;">
-#    """
-#)
-
 # Make a layout
 layout = column(
     row(title_div),
+    column(
+        row(clim_min_text_input,clim_max_text_input,clim_update_button),
+        row(cmap_dropdown),
+        row(aerosol_file_text_input,aerosol_file_button),
+        row(json_load_text_input,json_load_button),
+        row(json_save_text_input,json_save_button),
+        width=500),
     fig,
     row(
         column(
-            row(clim_min_text_input,clim_max_text_input,clim_update_button),
-            row(aerosol_file_text_input,aerosol_file_button),
-            row(json_load_text_input,json_load_button),
-            row(json_save_text_input,json_save_button),
-            row(check_dist_button, remove_selected_polygon_button),
+            #row(check_dist_button), 
+            row(remove_selected_polygon_button),
             row(fit_modes_text_input,fit_modes_button,remove_modes_button),
-            row(button_spacer,fit_maxconc_button,remove_maxconc_button),
+            #row(button_spacer,fit_maxconc_button,remove_maxconc_button),
             row(dropdown, add_option_text_input), 
             row(label_submit_button,add_option_button, remove_option_button),
             row(info_div),

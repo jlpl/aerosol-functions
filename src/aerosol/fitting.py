@@ -205,12 +205,16 @@ def fit_multimode(x, y, timestamp, n_modes = None, n_samples = 10000):
     x_interp = s.index.values
     y_interp = s.values
 
-    coef = np.trapz(y_interp,x_interp)
-    samples = af.sample_from_dist(x_interp,y_interp,n_samples)
-
     all_ok = True
 
-    if n_modes is None:
+    # There should be at least 3 points available
+    if len(x_interp)<3:
+        all_ok = False
+    else:
+        coef = np.trapz(y_interp,x_interp)
+        samples = af.sample_from_dist(x_interp,y_interp,n_samples)
+
+    if ((n_modes is None) and all_ok):
 
         scores = []
         n_range = []
@@ -261,20 +265,27 @@ def fit_multimode(x, y, timestamp, n_modes = None, n_samples = 10000):
                       n_modes = n_modes-1
                       gaussians_gmm = fit_gmm(samples, n_modes, coef, None, None)
                       gaussians_lsq = fit_multimodal_gaussian_kde(x_interp, y_interp, gaussians_gmm)
+                      if gaussians_lsq is None:
+                          break
                   else:
                       break
 
-              gaussians = remove_far_peaks(x_interp,gaussians_lsq)
-
-              if len(gaussians)==0:
-                  print("final number of gaussians was zero")
+              if gaussians_lsq is not None:
+                  gaussians = remove_far_peaks(x_interp,gaussians_lsq)
+                  if len(gaussians)==0:
+                      print("final number of gaussians was zero")
+                      all_ok = False
+              else:
+                  print("final fit was none")
                   all_ok = False
-    else:
+    elif ((n_modes is not None) and all_ok):
         gaussians_gmm = fit_gmm(samples, n_modes, coef, None, None)
         gaussians = fit_multimodal_gaussian_kde(x_interp, y_interp, gaussians_gmm)
         if gaussians is None:
             print("fit was none")
             all_ok = False
+    else:
+        pass
 
     if all_ok:
         # Make sure all the data is json compatible
@@ -338,6 +349,9 @@ def fit_multimodes(df, n_modes = None, n_samples = 10000):
         List of fit results
 
     """
+    # Remove all nan rows
+    df = df.dropna(how="all",axis=0)
+
     x = np.log10(df.columns.values.astype(float)*1e9)
     fit_results = []
     for j in range(df.shape[0]):

@@ -19,6 +19,7 @@ from matplotlib.pyplot import cm
 from datetime import datetime, timedelta
 from scipy.optimize import minimize
 from scipy.interpolate import interp1d
+from scipy.integrate import trapezoid
 from astral import Observer
 from astral.sun import noon
 
@@ -902,10 +903,13 @@ def calc_conc(df,dmin,dmax,frac=0.5):
     return conc_df
 
 
+
+# TODO: fix this...
 def calc_conc_interp(df,dmin,dmax):
     """
     Calculate particle number concentration from aerosol
-    number-size distribution by interpolating between bins 
+    number-size distribution using integration and linear 
+    approximation
 
     Parameters
     ----------
@@ -923,47 +927,46 @@ def calc_conc_interp(df,dmin,dmax):
     dataframe
         Number concentration in the given size range(s), unit: cm-3
 
+    Note
+    ----
+
+    If you provide volume or surface size distribution the result
+    will be volume concentration or surface concentration
+
     """
 
     dmin = pd.Series(dmin)
     dmax = pd.Series(dmax)
 
-    dp = df.columns.values.astype(float)
+    # interpolate away the nans
+    df = df.interpolate(limit_area="inside",axis=1).dropna(how="all",axis=1).interpolate(axis=1)
 
-    # Create dense diameter grid
-    dp_grid = np.logspace(np.log10(dp).min(),np.log10(dp).max(),1000)
+    logdp = np.log10(df.columns.astype(float).values)
+    data = df.values
 
-    # Interpolate to dense diameter grid
-    df_interp = df.reindex(
-        dp_grid,
-        axis=1,
-        method="nearest",
-        tolerance=dp_grid[1]-dp_grid[0]).interpolate(
-            axis=1,
-            limit_area="inside",
-            method="linear").dropna(
-                axis=1,
-                how="all")
-
-    # Update the diameter grid
-    dp_grid = df_interp.columns.values.astype(float)
-
-    # Calculate bin widths in log scale 
-    dlogdp_grid = np.diff(calc_bin_edges(pd.Series(dp_grid)))
-
-    # Transform dN/dlogDp -> dN
-    dn_interp = df_interp * dlogdp_grid
+    min_logdp = np.min(logdp)
+    max_logdp = np.max(logdp)
 
     conc_df = pd.DataFrame(index = df.index, columns = np.arange(len(dmin)))
 
     for i in range(len(dmin)):
-        dp1 = np.max([dp_grid.min(), dmin.values[i]])
-        dp2 = np.min([dp_grid.max(), dmax.values[i]])
-        findex = np.argwhere((dp_grid<dp2)&(dp_grid>=dp1)).flatten()
-        conc = dn_interp.iloc[:,findex].sum(axis=1,min_count=1)
+
+        dmini = np.max([np.log10(dmin[i]), min_logdp]) 
+        dmaxi = np.min([np.log10(dmax[i]), max_logdp])
+
+        dp_grid = np.linspace(dmini,dmaxi,1000)
+
+        data_interp = np.nan*np.ones((data.shape[0],len(dp_grid)))
+
+        for j in range(data.shape[0]):
+            data_interp[j,:] = np.interp(dp_grid,logdp,data[j,:])
+
+        conc = trapezoid(data_interp, x = dp_grid, axis=1)
+
         conc_df.iloc[:,i] = conc
 
     return conc_df
+
 
 def calc_formation_rate(
     df,

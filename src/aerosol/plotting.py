@@ -442,9 +442,10 @@ def plot_aerosol_dist(
     ax,
     norm="log",
     clim=None,
-    xminortick_interval="1h",
-    xmajortick_interval="2h",
-    xticklabel_format="%H:%M"):    
+    cmap="turbo",
+    xmajortick_interval=None,
+    xminortick_interval=None,
+    xticklabel_format="%Y-%m-%d %H:%M"):    
     """ 
     Plot aerosol particle number-size distribution surface plot
 
@@ -484,7 +485,15 @@ def plot_aerosol_dist(
     tim = v.index
     dp = v.columns.values.astype(float)
     dndlogdp = v.values.astype(float)
+   
+    # Find optimum interval for minor and major ticks
     
+    if (xmajortick_interval is None) or (xminortick_interval is None):
+        xmajortick_interval = pd.tseries.frequencies.to_offset(((tim.max() - tim.min())/10))
+        xminortick_interval = pd.tseries.frequencies.to_offset((tim.max() - tim.min())/(10*2)) 
+    else:
+        pass
+
     time_minorticks,time_majorticks,time_ticklabels = generate_timeticks(
         tim[0],tim[-1],xminortick_interval,xmajortick_interval,xticklabel_format)
     handle.set_xticks(time_minorticks,minor=True)
@@ -507,7 +516,8 @@ def plot_aerosol_dist(
         raise ValueError(f"Invalid input: {norm}. Expected one of {allowed_norm_values}.")
 
     if clim is None:
-        clim = np.nanpercentile(dndlogdp,[5,95])
+        clim = np.nanpercentile(dndlogdp,[10,90])
+
 
     if norm=="linear":
         norm = colors.Normalize(clim[0],clim[1])
@@ -518,13 +528,15 @@ def plot_aerosol_dist(
         np.flipud(dndlogdp.T),
         origin="upper",
         aspect="auto",
-        cmap=cm.turbo,
+        cmap=cm.get_cmap(cmap),
         norm=norm,
         extent=(t1,t2,dp1,dp2)
     )
 
     handle.set_ylim((dp1,dp2))
     handle.set_xlim((t1,t2))
+
+    rotate_xticks(handle,45)
 
     c_handle = plt.axes([origin[0]*1.03 + size[0]*1.03, origin[1], 0.02, size[1]])
     cbar = plt.colorbar(img,cax=c_handle)
