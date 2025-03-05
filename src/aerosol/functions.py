@@ -1010,9 +1010,9 @@ def calc_formation_rate(
 
     """
     
-    dn = dndlogdp2dn(df)
+    #dn = dndlogdp2dn(df)
 
-    dp = df.columns.values.astype(float)
+    #dp = df.columns.values.astype(float)
 
     J = pd.DataFrame(index = df.index)
 
@@ -1023,22 +1023,19 @@ def calc_formation_rate(
     pres = pd.Series(pres)
 
     for i in range(len(dp1)):
-        idx = np.argwhere((dp>=dp1[i]) & (dp<=dp2[i])).flatten()
+        #idx = np.argwhere((dp>=dp1[i]) & (dp<=dp2[i])).flatten()
+        conc = calc_conc(df,dp1[i],dp2[i])
 
-        # calculate sink to the pre-existing particles 
-        sink_term = np.zeros(len(df.index))
-        for j in idx:
-            sink_term = sink_term + calc_coags(df,dp[j],temp,pres).values.flatten() * dn.iloc[:,j].values.flatten()
+        # Sink term
+        sink_term = calc_coags(df,np.sqrt(dp1[i]*dp2[i]),temp,pres).values.flatten() * conc.values.flatten()
     
-        # Conc term (observed change in the size range number concentration)
+        # Conc term
         dt = df.index.to_frame().diff().values.astype("timedelta64[s]").astype(float).flatten()
         dt[dt<=0] = np.nan    
-        conc = calc_conc(df,dp1[i],dp2[i])
         conc_term = conc.diff().values.flatten()/dt
     
-        # GR term (consider the largest size in our size range)
-        # GR is usually calculated for the size range 
-        gr_term = (2.778e-13*gr[i])/(dp2[i]-dp1[i]) * dn.iloc[:,int(np.max(idx))].values.flatten()
+        # GR term 
+        gr_term = (2.778e-13*gr[i])/(dp2[i]-dp1[i]) * conc.values.flatten()
         
         formation_rate = conc_term + sink_term + gr_term
 
@@ -1093,11 +1090,11 @@ def calc_ion_formation_rate(
 
     """
 
-    dn_particles = dndlogdp2dn(df_particles)
-    dn_negions = dndlogdp2dn(df_negions)
-    dn_posions = dndlogdp2dn(df_posions)
+    #dn_particles = dndlogdp2dn(df_particles)
+    #dn_negions = dndlogdp2dn(df_negions)
+    #dn_posions = dndlogdp2dn(df_posions)
 
-    dp = df_negions.columns.values.astype(float)
+    #dp = df_negions.columns.values.astype(float)
     time = df_negions.index
 
     J_negions = pd.DataFrame(index = df_negions.index)
@@ -1116,28 +1113,24 @@ def calc_ion_formation_rate(
     pres = pd.Series(pres)
 
     for i in range(len(dp1)):
-        idx = np.argwhere((dp>=dp1[i]) & (dp<=dp2[i])).flatten()
+        #idx = np.argwhere((dp>=dp1[i]) & (dp<=dp2[i])).flatten()
+
+        conc_negions = calc_conc(df_negions,dp1[i],dp2[i])
+        conc_posions = calc_conc(df_posions,dp1[i],dp2[i])
 
         # Sink terms
-        sink_term_negions = np.zeros(len(time))
-        sink_term_posions = np.zeros(len(time))
-        for j in idx:
-            sink_term_negions = sink_term_negions + calc_coags(df_particles,dp[j],temp,pres).values.flatten() * dn_negions.iloc[:,j].values.flatten()
-            sink_term_posions = sink_term_posions + calc_coags(df_particles,dp[j],temp,pres).values.flatten() * dn_posions.iloc[:,j].values.flatten()
+        sink_term_negions = calc_coags(df_particles,np.sqrt(dp1[i]*dp2[i]),temp,pres).values.flatten() * conc_negions.values.flatten()
+        sink_term_posions = calc_coags(df_particles,np.sqrt(dp1[i]*dp2[i]),temp,pres).values.flatten() * conc_posions.values.flatten()
 
         # Conc terms
         dt = time.to_frame().diff().values.astype("timedelta64[s]").astype(float).flatten()
         dt[dt<=0] = np.nan
-
-        conc_negions = calc_conc(df_negions,dp1[i],dp2[i])
         conc_term_negions = conc_negions.diff().values.flatten()/dt
-
-        conc_posions = calc_conc(df_posions,dp1[i],dp2[i])
         conc_term_posions = conc_posions.diff().values.flatten()/dt
  
         # GR terms
-        gr_term_negions = (2.778e-13*gr_negions[i])/(dp2[i]-dp1[i]) * dn_negions.iloc[:,int(np.max(idx))].values.flatten()
-        gr_term_posions = (2.778e-13*gr_posions[i])/(dp2[i]-dp1[i]) * dn_posions.iloc[:,int(np.max(idx))].values.flatten()
+        gr_term_negions = (2.778e-13*gr_negions[i])/(dp2[i]-dp1[i]) * conc_negions.values.flatten()
+        gr_term_posions = (2.778e-13*gr_posions[i])/(dp2[i]-dp1[i]) * conc_posions.values.flatten()
 
         # Recombination terms
         conc_small_negions = calc_conc(df_negions,0.5e-9,dp1[i])
@@ -1619,6 +1612,41 @@ def utc2solar(utc_time,lon,lat):
     return solar_time
 
 
+
+
+def calc_mob_ratio(neg_ions,pos_ions):
+    
+    neg_ions[neg_ions<=0] = np.nan
+    pos_ions[pos_ions<=0] = np.nan
+
+    neg_ions = neg_ions.interpolate(limit_direction="both",axis=1).rolling(window=5).median().interpolate(limit_direction="both")
+    pos_ions = pos_ions.interpolate(limit_direction="both",axis=1).rolling(window=5).median().interpolate(limit_direction="both")
+
+    x = np.exp(np.log(neg_ions.values/pos_ions.values)/2.0)
+
+    return pd.DataFrame(index = neg_ions.index, columns=neg_ions.columns, data=x)
+
+def atmo_ion_frac(dp,q,temp=273.15,mob_ratio=1.0):
+
+    if (np.abs(q)==1):
+        alpha = 0.9630*np.exp(7.6019/(dp+2.2476))
+    elif (np.abs(q)==2):
+        alpha = 0.9826+0.9435*np.exp(-0.0478*dp)
+    else:
+        alpha = 1.0
+   
+    x = mob_ratio
+    T = temp
+
+    f = (E/np.sqrt(4*np.pi**2*E_0*alpha*dp*K_B*T)*
+            np.exp( 
+                (-(q-(2*np.pi*E_0*alpha*dp*K_B*T)/(E**2)*np.log(x))**2)/
+                ((4*np.pi*E_0*alpha*dp*K_B*T)/(E**2)) 
+            )) 
+    
+    return f
+
+
 def ions2particles(neg_ions,pos_ions,temp=293.15,mob_ratio=1.0):
     """
     Estimate particle number size distribution from ions using Li et al. (2022)
@@ -1650,7 +1678,7 @@ def ions2particles(neg_ions,pos_ions,temp=293.15,mob_ratio=1.0):
     """
 
     # Template for the particle number size distribution  
-    particles = neg_ions.copy()*np.nan
+    particles = np.nan*np.ones(neg_ions.shape)
 
     dp = neg_ions.columns.values.astype(float)
 
@@ -1668,34 +1696,37 @@ def ions2particles(neg_ions,pos_ions,temp=293.15,mob_ratio=1.0):
     if isinstance(temp,float):
         temp = pd.Series(index = neg_ions.index, data=temp)
 
+    if mob_ratio is None:
+        X = calc_mob_ratio(neg_ions,pos_ions)
+
     # For each measurement time calculate the particle number size distribution
     for i in range(neg_ions.shape[0]):
 
-        x = mob_ratio
+        if mob_ratio is not None:
+            x = mob_ratio
+        else:
+            x = X.values[i,:]
         T = temp.values[i]
-            
+
         # Calculate the positive and negative charge fractions
         f_pos = (E/np.sqrt(4*np.pi**2*E_0*alpha*dp*K_B*T)*
             np.exp( 
                 (-(q-(2*np.pi*E_0*alpha*dp*K_B*T)/(E**2)*np.log(x))**2)/
                 ((4*np.pi*E_0*alpha*dp*K_B*T)/(E**2)) 
-            ))
-    
+            )) 
         f_neg = (E/np.sqrt(4*np.pi**2*E_0*alpha*dp*K_B*T)*
             np.exp( 
                 (-(-q-(2*np.pi*E_0*alpha*dp*K_B*T)/(E**2)*np.log(x))**2)/
                 ((4*np.pi*E_0*alpha*dp*K_B*T)/(E**2)) 
             ))
-       
         # Add the charge fractions together 
         f_tot = f_pos + f_neg
         f = np.nansum(f_tot,axis=0)
         f[f<=0]=np.nan
-            
         # Calculate the particles
-        particles.iloc[i,:] = (pos_ions.iloc[i,:] + neg_ions.iloc[i,:])/f
-            
-    return particles
+        particles[i,:] = (pos_ions.values[i,:] + neg_ions.values[i,:])/f
+
+    return pd.DataFrame(data=particles,index = neg_ions.index,columns=neg_ions.columns)
 
 def calc_tube_residence_time(tube_diam,tube_length,flowrate):
     """
@@ -2027,3 +2058,180 @@ def sample_from_dist(x,y,n):
     samples = np.interp(random_values, cdf, x)
 
     return samples
+
+
+def denan(df):
+    """
+    Interpolate away any nans and drop nan tails
+
+    Parameters
+    ----------
+
+    df :  pandas datafarme
+
+    Returns
+    -------
+
+    pandas dataframe
+
+    """
+    return df.interpolate(limit_area="inside").dropna(how="all",axis=0)
+
+def nanoranking(df, dmin, dmax):
+    """
+    Simplified method of calculating the nanorank
+
+    Parameters
+    ----------
+
+    df : pandas dataframe
+        number size distribution
+    dmin : float
+        lower diameter limit
+    dmax : float
+        upper diameter limit
+
+    Returns
+    -------
+
+    pandas dataframe
+
+    Notes
+    -----
+
+    The nanorank is calculated for one day day. See Aliaga et al 2023  
+
+    """
+
+    # Remove NaNs
+    df = denan(df)
+    # Calculate the number concentration
+    conc = af.calc_conc_interp(df,dmin,dmax).iloc[:,0] # Series
+    # Subtract the background
+    norm_conc = conc-np.median(conc)
+    # Retrieve the rank and the rank time
+    rank = norm_conc.max()
+    rank_time = norm_conc.idxmax()
+
+    return rank, rank_time
+
+def normalize_signal(signal):
+    return (signal - np.min(signal)) / (np.max(signal) - np.min(signal))
+
+def normalized_cross_correlation(x, y):
+    # Remove means
+    x_mean = np.mean(x)
+    y_mean = np.mean(y)
+    x_zero_mean = x - x_mean
+    y_zero_mean = y - y_mean
+    
+    # Compute cross-correlation
+    corr = correlate(x_zero_mean, y_zero_mean, mode='same', method='auto')
+    
+    # Normalize by product of standard deviations and length
+    norm_factor = len(x) * np.std(x) * np.std(y)
+    normalized_corr = corr / norm_factor
+
+    # Find the number of shifts
+    mid = len(x) // 2
+    if len(x) % 2 == 0:
+        lags = np.arange(-mid + 1, mid + 1)
+    else:
+        lags = np.arange(-mid, mid + 1)
+    
+    return lags, normalized_corr
+
+def cross_corr_gr(df, dmin, dmax, window_width_hours=3.0):
+    """
+    Calculate GR using cross-correlation method
+
+    Parameters
+    ----------
+
+    df : pandas dataframe
+        Aerosol number size distribution
+    dmin : float
+        Lower size limit for GR
+    dmax : float
+        Upper size limit for GR
+    smoothing_window : float
+        window length used in smoothing the data in hours
+
+    Returns
+    -------
+
+    dictionary
+        Results in a dictionary:
+
+        gr: growth rate in nm/h
+
+        lags: time shifts applied in seconds
+        
+        corrs: correlation coefficicients for the lags
+
+        max_corr_lag: time shift with maximum correlation
+
+        max_corr: the value of the maximum correlation
+
+        channels: concentration in the two size channels normalized between 0 and 1
+
+    """ 
+    # denan for rolling mean
+    df = denan(df)
+
+    # find the resolution
+    time_diffs = df.index.to_series().diff().dropna()
+    mean_timestep_hours = time_diffs.mean().total_seconds() / 3600.
+    window_length = round(window_width_hours / mean_timestep_hours)
+
+    # Smooth noise
+    df = df.rolling(window=window_length).mean()
+    # denan again
+    df = denan(df)
+
+    # Interpolate to dmin and dmax
+    logdp = np.log10(df.columns.astype(float).values)
+
+    dp_grid = np.array([np.log10(dmin),np.log10(dmax)])
+    
+    data_interp = np.nan*np.ones((df.shape[0],2))
+    for j in range(df.shape[0]):
+        data_interp[j,:] = np.interp(dp_grid,logdp,df.iloc[j,:].values)
+
+    # Interpolate to dense time grid
+    t = (df.index-df.index[0]).total_seconds().values
+    
+    t_grid = np.arange(0,t[-1]+1)
+    
+    data_interp2 = np.nan*np.ones((len(t_grid),data_interp.shape[1]))
+    for j in range(data_interp.shape[1]):
+        data_interp2[:,j] = np.interp(t_grid,t,data_interp[:,j])
+
+    # Between 0 and 1
+    channel1=normalize_signal(data_interp2[:,0])
+    channel2=normalize_signal(data_interp2[:,1])
+    
+    # Calculate cross correlation
+    lag, corr = normalized_cross_correlation(channel1,channel2)
+    
+    max_corr_lag = -lag[np.argmax(corr)] # seconds
+    max_lag = np.max(lag)
+    max_corr = np.max(corr)
+
+    if ((max_corr_lag>0) & (max_corr_lag<max_lag)):
+        gr = (dmax-dmin)*1e9/(max_corr_lag/(60*60)) # nm/h
+    else:
+        gr=np.nan
+
+    channels = pd.DataFrame(index=t_grid,data={dmin:channel1,dmax:channel2})
+
+    result = {
+        "gr":gr,
+        "lags":lag,
+        "corrs":corr,
+        "max_corr_lag":max_corr_lag,
+        "max_corr":max_corr,
+        "channels": channels
+    }
+     
+    return result 

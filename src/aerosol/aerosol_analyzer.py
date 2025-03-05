@@ -624,8 +624,8 @@ def remove_option(event):
         dropdown.options.remove(add_option_text_input.value)
         add_option_text_input.value = ""
 
-def on_cmap_select(event):
-    #TODO Update to new colormap that was selected
+#def on_cmap_select(event):
+#    #TODO Update to new colormap that was selected
 
 
 def close_app():
