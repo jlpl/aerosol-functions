@@ -2108,7 +2108,7 @@ def nanoranking(df, dmin, dmax):
     # Remove NaNs
     df = denan(df)
     # Calculate the number concentration
-    conc = af.calc_conc_interp(df,dmin,dmax).iloc[:,0] # Series
+    conc = calc_conc_interp(df,dmin,dmax).iloc[:,0] # Series
     # Subtract the background
     norm_conc = conc-np.median(conc)
     # Retrieve the rank and the rank time

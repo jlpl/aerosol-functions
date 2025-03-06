@@ -2,7 +2,7 @@
 
 This package is a collection of tools to analyze and visualize atmospheric aerosol and ion data.
 
-Latest version: 0.1.9
+Latest version: 0.1.10
 
 ## Installation
 
