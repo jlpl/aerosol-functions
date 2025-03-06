@@ -22,6 +22,8 @@ from scipy.interpolate import interp1d
 from scipy.integrate import trapezoid
 from astral import Observer
 from astral.sun import noon
+from scipy.signal import correlate
+
 
 # All constants are SI base units
 E=1.602E-19           # elementary charge
@@ -2163,17 +2165,17 @@ def cross_corr_gr(df, dmin, dmax, window_width_hours=3.0):
     dictionary
         Results in a dictionary:
 
-        gr: growth rate in nm/h
+        `gr`: growth rate in nm/h
 
-        lags: time shifts applied in seconds
+        `lags`: time shifts applied in seconds
         
-        corrs: correlation coefficicients for the lags
+        `corrs`: correlation coefficicients for the lags
 
-        max_corr_lag: time shift with maximum correlation
+        `max_corr_lag`: time shift with maximum correlation
 
-        max_corr: the value of the maximum correlation
+        `max_corr`: the value of the maximum correlation
 
-        channels: concentration in the two size channels normalized between 0 and 1
+        `channels`: concentration in the two size channels normalized between 0 and 1
 
     """ 
     # denan for rolling mean
