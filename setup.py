@@ -5,13 +5,13 @@ with open("README.md","r") as fh:
 
 setup(
     name = "aerosol-functions",
-    version = "0.1.10",
+    version = "0.1.11",
     description = 'Functions to analyze atmospheric aerosol data',
     package_dir = {'':'src'},
     packages = ['aerosol'],
     entry_points = {
         'console_scripts': [
-            'aerosol-analyzer = aerosol.cmd:run_app',
+            'aerosol-analyzer = aerosol.my_cmd:run_app',
         ],
     },
     long_description = long_description,

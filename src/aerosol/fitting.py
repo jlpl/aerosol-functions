@@ -1,21 +1,10 @@
-"""
-Aerosol number-size distribution is assumed to be a pandas DataFrame where
-
-index: 
-    time, pandas.DatetimeIndex
-columns: 
-    size bin diameters in meters, float
-values: 
-    normalized concentration dN/dlogDp in cm-3, float
-
-"""
-
 from sklearn.mixture import GaussianMixture
 from kneed import KneeLocator
 import numpy as np
 import pandas as pd
 import aerosol.functions as af
 from scipy.optimize import curve_fit
+
 
 def to_meters(x):
     return (10**x)*1e-9

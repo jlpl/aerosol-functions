@@ -1,15 +1,19 @@
 """
-Aerosol number-size distribution is assumed to be a pandas DataFrame where
+Aerosol number-size distribution
+--------------------------------
 
-index: 
-    time, pandas.DatetimeIndex
-columns: 
-    size bin diameters in meters, float
-values: 
-    normalized concentration dN/dlogDp in cm-3, float
+In the below functions of this package aerosol number-size distribution is assumed to be a `pandas DataFrame` where
+
+index : pandas DatetimeIndex
+    timestamps
+columns : float 
+    size bin geomean diameters, m
+values : float 
+    normalized concentration, dN/dlogDp, cm-3
+
+
 
 """
-
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -23,7 +27,6 @@ from scipy.integrate import trapezoid
 from astral import Observer
 from astral.sun import noon
 from scipy.signal import correlate
-
 
 # All constants are SI base units
 E=1.602E-19           # elementary charge
@@ -45,7 +48,6 @@ def get_index(args):
 def check_lengths(series_list):
     lengths = [len(series) for series in series_list if len(series) > 1]
     return all(length == lengths[0] for length in lengths)
-
 
 def air_density(temp,pres):
     """
@@ -128,7 +130,6 @@ def datetime2datenum(dt):
     mdn = dt + timedelta(days = 366)
     frac = (dt-datetime(dt.year,dt.month,dt.day,0,0,0)).seconds / (24.0 * 60.0 * 60.0)
     return mdn.toordinal() + frac
-
 
 def calc_bin_edges(dp):
     """
@@ -904,10 +905,18 @@ def calc_conc(df,dmin,dmax,frac=0.5):
 
     return conc_df
 
+def filter_nans(df, threshold=0.0, axis=1):
+    if (axis==0):
+        return df.iloc[:,(df.isnull().mean(axis=axis)<=threshold).values]
+    if (axis==1):
+        return df.iloc[(df.isnull().mean(axis=axis)<=threshold).values,:]
 
 
-# TODO: fix this...
-def calc_conc_interp(df,dmin,dmax):
+    #frac = (df.shape[axis] - df.isna().sum(axis=axis)) / df.shape[axis]
+    #df_filtered = df[frac >= threshold]
+    #return df_filtered
+
+def calc_conc_interp(df,dmin,dmax,threshold=0.0):
     """
     Calculate particle number concentration from aerosol
     number-size distribution using integration and linear 
@@ -922,12 +931,15 @@ def calc_conc_interp(df,dmin,dmax):
         Size range lower diameter(s), unit: m
     dmax : float or series of length n
         Size range upper diameter(s), unit: m
+    threshold : float
+        fraction of nans accepted per row
 
     Returns
     -------
 
     dataframe
         Number concentration in the given size range(s), unit: cm-3
+        in the index of the original dataframe 
 
     Note
     ----
@@ -940,16 +952,22 @@ def calc_conc_interp(df,dmin,dmax):
     dmin = pd.Series(dmin)
     dmax = pd.Series(dmax)
 
-    # interpolate away the nans
-    df = df.interpolate(limit_area="inside",axis=1).dropna(how="all",axis=1).interpolate(axis=1)
+    # Only keep rows with more than threshold fraction of nan-values
+    df_filt = filter_nans(df,threshold=threshold,axis=1)
 
-    logdp = np.log10(df.columns.astype(float).values)
-    data = df.values
+    if df_filt.empty:
+        return pd.DataFrame(index = df.index,columns = np.arange(len(dmin)))
+
+    # Interpolate away the nans
+    df_filt = df_filt.interpolate(limit_area="inside",axis=1).dropna(how="all",axis=1).interpolate(axis=1)
+
+    logdp = np.log10(df_filt.columns.astype(float).values)
+    data = df_filt.values
 
     min_logdp = np.min(logdp)
     max_logdp = np.max(logdp)
 
-    conc_df = pd.DataFrame(index = df.index, columns = np.arange(len(dmin)))
+    conc_df = pd.DataFrame(index = df_filt.index, columns = np.arange(len(dmin)))
 
     for i in range(len(dmin)):
 
@@ -967,7 +985,7 @@ def calc_conc_interp(df,dmin,dmax):
 
         conc_df.iloc[:,i] = conc
 
-    return conc_df
+    return conc_df.reindex(df.index)
 
 
 def calc_formation_rate(
@@ -1528,19 +1546,6 @@ def thab_volts2dp(thab_voltage,dma_voltage):
     
     return dp
 
-#def psl_volts2dp(psl_dp, psl_voltage, dma_voltage):
-#    """
-#    """
-#    return (dma_voltage * psl_dp)/psl_voltage
-#
-#def psl_dp2volts(psl_dp, psl_voltage, dp):
-#    """
-#    """
-#    return (dp * psl_voltage)/psl_dp
-#    
-#
-#def psl_volts2dp():
-
 def eq_charge_frac(dp,N):
     """
     Calculate equilibrium charge fraction using Wiedensohler (1988) approximation
@@ -1748,7 +1753,7 @@ def calc_tube_residence_time(tube_diam,tube_length,flowrate):
     -------
 
     float or dataframe of shape (n,m)
-        Residence time in seconds
+        Average residence time in seconds
 
     """
 
@@ -2039,7 +2044,7 @@ def sample_from_dist(x,y,n):
     x : numpy array
         x-data points
 
-    y: numpy array
+    y : numpy array
         y-data points
 
     n : int
@@ -2069,7 +2074,7 @@ def denan(df):
     Parameters
     ----------
 
-    df :  pandas datafarme
+    df : pandas datafarme
 
     Returns
     -------
@@ -2079,7 +2084,7 @@ def denan(df):
     """
     return df.interpolate(limit_area="inside").dropna(how="all",axis=0)
 
-def nanoranking(df, dmin, dmax):
+def nanoranking(df, dmin, dmax, row_threshold=0, col_threshold=0):
     """
     Simplified method of calculating the nanorank
 
@@ -2092,11 +2097,22 @@ def nanoranking(df, dmin, dmax):
         lower diameter limit
     dmax : float
         upper diameter limit
-
+    row_threshold : float
+        maximum fraction of nans when calculating the number concentartion
+    col_threshold : float
+        maximum fraction of nans in the conentration timeseries
+    
     Returns
     -------
 
-    pandas dataframe
+    dictionary
+        the result dictionary has the following keys:
+        
+        `norm_conc`: Concentration with removed background
+
+        `rank`: Value of the peak normalized concentration
+
+        `rank_time`: Time where the peak occurs
 
     Notes
     -----
@@ -2105,17 +2121,30 @@ def nanoranking(df, dmin, dmax):
 
     """
 
-    # Remove NaNs
-    df = denan(df)
     # Calculate the number concentration
-    conc = calc_conc_interp(df,dmin,dmax).iloc[:,0] # Series
+    conc = calc_conc_interp(df,dmin,dmax, threshold = row_threshold)
+
+    # Check if rows has enough data points
+    conc = filter_nans(conc, threshold = col_threshold, axis=0)
+
+    # Melpitz, Lund, Clermont, ferand sellegri long data,   
+
+    if conc.empty:
+        return None
+
     # Subtract the background
-    norm_conc = conc-np.median(conc)
+    norm_conc = conc.iloc[:,0]-np.nanmedian(conc)
     # Retrieve the rank and the rank time
     rank = norm_conc.max()
     rank_time = norm_conc.idxmax()
 
-    return rank, rank_time
+    result = {
+        "norm_conc": norm_conc, # series
+        "rank": rank,
+        "rank_time": rank_time
+    }
+
+    return result
 
 def normalize_signal(signal):
     return (signal - np.min(signal)) / (np.max(signal) - np.min(signal))
@@ -2143,7 +2172,7 @@ def normalized_cross_correlation(x, y):
     
     return lags, normalized_corr
 
-def cross_corr_gr(df, dmin, dmax, window_width_hours=3.0):
+def cross_corr_gr(df, dmin, dmax, window_width_hours=3.0, row_threshold=0.0, col_threshold=0.0):
     """
     Calculate GR using cross-correlation method
 
@@ -2157,7 +2186,11 @@ def cross_corr_gr(df, dmin, dmax, window_width_hours=3.0):
     dmax : float
         Upper size limit for GR
     smoothing_window : float
-        window length used in smoothing the data in hours
+        Window length used in smoothing the data in hours
+    row_threshold : float
+        Maximum fraction of NaNs present in the rows
+    col_thershold : float
+        Maximum fraction of NaNs present in the columns
 
     Returns
     -------
@@ -2178,18 +2211,23 @@ def cross_corr_gr(df, dmin, dmax, window_width_hours=3.0):
         `channels`: concentration in the two size channels normalized between 0 and 1
 
     """ 
-    # denan for rolling mean
+    # Filter out rows with too many NaNs
+    df = filter_nans(df, threshold=col_threshold, axis=1)    
+    df = filter_nans(df, threshold=row_threshold, axis=0)    
+
+    if df.empty:
+        return None
+
+    # Then filter out the nans from the whole data frame
     df = denan(df)
 
-    # find the resolution
+    # Find the resolution and determine the window length
     time_diffs = df.index.to_series().diff().dropna()
     mean_timestep_hours = time_diffs.mean().total_seconds() / 3600.
     window_length = round(window_width_hours / mean_timestep_hours)
 
-    # Smooth noise
-    df = df.rolling(window=window_length).mean()
-    # denan again
-    df = denan(df)
+    # Smooth the signals
+    df = df.rolling(window=window_length, min_periods=1).mean()
 
     # Interpolate to dmin and dmax
     logdp = np.log10(df.columns.astype(float).values)
@@ -2228,11 +2266,11 @@ def cross_corr_gr(df, dmin, dmax, window_width_hours=3.0):
     channels = pd.DataFrame(index=t_grid,data={dmin:channel1,dmax:channel2})
 
     result = {
-        "gr":gr,
-        "lags":lag,
-        "corrs":corr,
-        "max_corr_lag":max_corr_lag,
-        "max_corr":max_corr,
+        "gr": gr,
+        "lags": lag,
+        "corrs": corr,
+        "max_corr_lag": max_corr_lag,
+        "max_corr": max_corr,
         "channels": channels
     }
      

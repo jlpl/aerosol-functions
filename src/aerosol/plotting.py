@@ -7,7 +7,6 @@ from matplotlib.pyplot import cm
 from datetime import datetime, timedelta
 from scipy.optimize import minimize
 
-
 def plot_one_to_one_line(ax=None, color='black', linestyle='--', linewidth=1):
     """
     Draws a one-to-one line (y = x) on the visible part of the plot.
