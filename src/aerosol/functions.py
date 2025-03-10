@@ -993,6 +993,7 @@ def calc_formation_rate(
     dp1,
     dp2,
     gr,
+    coags = None,
     temp=293.15,
     pres=101325.):
     """
@@ -1014,6 +1015,10 @@ def calc_formation_rate(
     gr : float or series of length n
         Growth rate for particles out of the size range(s), 
         unit nm h-1
+    coags : dataframe or None 
+        Coagulation sink of representative diameter, If `None` it is
+        calculated from the number size distribution
+        Unit: s-1
     temp : float or series
         Ambient temperature corresponding to the data, 
         unit K
@@ -1046,14 +1051,17 @@ def calc_formation_rate(
         #idx = np.argwhere((dp>=dp1[i]) & (dp<=dp2[i])).flatten()
         conc = calc_conc(df,dp1[i],dp2[i])
 
-        # Sink term
-        sink_term = calc_coags(df,np.sqrt(dp1[i]*dp2[i]),temp,pres).values.flatten() * conc.values.flatten()
-    
         # Conc term
         dt = df.index.to_frame().diff().values.astype("timedelta64[s]").astype(float).flatten()
         dt[dt<=0] = np.nan    
-        conc_term = conc.diff().values.flatten()/dt
-    
+        conc_term = conc.diff().values.flatten()/dt 
+
+        # Sink term
+        if coags is None:
+            sink_term = calc_coags(df,np.sqrt(dp1[i]*dp2[i]),temp,pres).values.flatten() * conc.values.flatten()
+        else:
+            sink_term = coags.iloc[:,i].values.flatten()
+
         # GR term 
         gr_term = (2.778e-13*gr[i])/(dp2[i]-dp1[i]) * conc.values.flatten()
         
@@ -2127,8 +2135,6 @@ def nanoranking(df, dmin, dmax, row_threshold=0, col_threshold=0):
     # Check if rows has enough data points
     conc = filter_nans(conc, threshold = col_threshold, axis=0)
 
-    # Melpitz, Lund, Clermont, ferand sellegri long data,   
-
     if conc.empty:
         return None
 
@@ -2224,7 +2230,12 @@ def cross_corr_gr(df, dmin, dmax, window_width_hours=3.0, row_threshold=0.0, col
     # Find the resolution and determine the window length
     time_diffs = df.index.to_series().diff().dropna()
     mean_timestep_hours = time_diffs.mean().total_seconds() / 3600.
-    window_length = round(window_width_hours / mean_timestep_hours)
+    window_length = np.round(window_width_hours / mean_timestep_hours)
+
+    if np.isnan(window_length):
+        return None
+    else:
+        window_length = int(window_length)
 
     # Smooth the signals
     df = df.rolling(window=window_length, min_periods=1).mean()
