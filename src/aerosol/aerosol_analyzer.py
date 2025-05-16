@@ -1,7 +1,7 @@
 from functools import partial
 from bokeh.io import curdoc
 from bokeh.layouts import column, row, Spacer
-from bokeh.models import TapTool, FreehandDrawTool, BoxEditTool, ColumnDataSource, Button, Div, TextInput, FileInput, CustomJS, Span, Scatter, TextAreaInput, Toolbar, Select
+from bokeh.models import TapTool, FreehandDrawTool, BoxEditTool, ColumnDataSource, Button, Div, TextInput, FileInput, CustomJS, Span, Scatter, TextAreaInput, Toolbar, Select, BoxEditTool, Patches
 from bokeh.plotting import figure
 from bokeh.events import ButtonClick
 import numpy as np
@@ -11,7 +11,7 @@ import matplotlib.pyplot as plt
 from bokeh.transform import linear_cmap
 from bokeh.models import ColorBar, LogColorMapper
 from bokeh import palettes
-from bokeh.palettes import Turbo256 as palette
+from bokeh.palettes import Turbo256,Cividis256,Magma256,Inferno256,Plasma256
 from bokeh.palettes import Category10
 import pandas as pd
 import json
@@ -23,24 +23,11 @@ import aerosol.fitting as afi
 from datetime import datetime, timezone
 from matplotlib.path import Path
 from sklearn.mixture import GaussianMixture
-
 from kneed import KneeLocator
 from scipy.signal import find_peaks
 from sklearn.neighbors import KernelDensity
 from scipy.optimize import curve_fit
 from scipy.interpolate import UnivariateSpline
-
-
-### TODO: 
-# Add box select tool
-# Add dropown menu for the colormap 
-#
-# Button 1: Fit all
-# Button 2: Fit selected
-# Button 3: Clear all
-# Button 4: Clear Selected
-# Button 5: Check dist should be on all the time
-
 
 def find_df_in_polygon(data,poly):
     # Return aerosol number size disribution from inside a rectangle 
@@ -102,7 +89,7 @@ def fit_modes_method(data):
     for j in range(data.shape[0]):
         conc = data.iloc[j,:].values.flatten()
 
-        res = afi.fit_multimode(dp, conc, "1970-01-01 00:00", n_modes = num_modes)
+        res = afi.fit_multimode(dp, conc, "1970-01-01 00:00", n_modes = num_modes, method = "lsqr")
 
         for r in res["gaussians"]: 
             peak = {
@@ -122,86 +109,135 @@ def fit_modes_method(data):
 
     return peaks
 
-#def fit_maxconc_method(data):
-#    global info_div
-#
-#    tim = data.index.values.astype(float)
-#    dp = np.log10(data.columns.astype(float).values*1e9)
-#
-#    peaks = []
-#
-#    info_text_updates = ""
-#
-#    for j in range(data.shape[1]):
-#        conc = data.iloc[:,j].values.flatten()
-#
-#        # Convert to pandas Series
-#        ds = pd.Series(index = tim, data = conc)
-#    
-#        # Interpolate away the NaN values but do not extrapolate, remove any NaN tails
-#        s = ds.interpolate(limit_area="inside").dropna()
-#    
-#        # Set negative values to zero
-#        s[s<0]=0
-#    
-#        # Recover x and y for fitting
-#        x_interp = s.index.values
-#        y_interp = s.values
-#
-#        # Ensure there is enough data    
-#        if ((len(x_interp)<3) & (len(y_interp)<3)):
-#            continue
-#
-#        # Perform fit
-#        coef = np.trapz(y_interp,x_interp)
-#
-#        samples = af.sample_from_dist(x_interp,y_interp,10000)
-#
-#        res = afi.fit_gmm(samples, 1, coef, None, None)
-#
-#        peak = {
-#            "time": res[0]["mean"], # milliseconds since epoch
-#            "diam": (10**dp[j])*1e-9, # meters
-#            "mean": res[0]["mean"],
-#            "sigma": res[0]["sigma"], 
-#            "amplitude": res[0]["amplitude"]
-#        }
-#
-#        peaks.append(peak)
-#
-#        dp_str = f"{10**dp[j]:.3f}"
-#        info_text_updates += f"Fitted: {dp_str} nm <br>"
-#
-#        info_div.text = info_text_updates
-#
-#    return peaks
+def fit_maxconc_method(data):
+    global info_div
+
+    tim = data.index.values.astype(float)
+    dp = np.log10(data.columns.astype(float).values*1e9)
+
+    peaks = []
+
+    info_text_updates = ""
+
+    for j in range(data.shape[1]):
+        conc = data.iloc[:,j].values.flatten()
+
+        # Convert to pandas Series
+        ds = pd.Series(index = tim, data = conc)
+    
+        # Interpolate away the NaN values but do not extrapolate, remove any NaN tails
+        s = ds.interpolate(limit_area="inside").dropna()
+    
+        # Set negative values to zero
+        s[s<0]=0
+    
+        # Recover x and y for fitting
+        x_interp = s.index.values
+        y_interp = s.values
+
+        # Ensure there is enough data    
+        if ((len(x_interp)<3) & (len(y_interp)<3)):
+            continue
+
+        # Perform fit
+        coef = np.trapz(y_interp,x_interp)
+
+        samples = af.sample_from_dist(x_interp,y_interp,10000)
+
+        res = afi.fit_gmm(samples, 1, coef)
+
+        peak = {
+            "time": res[0]["mean"], # milliseconds since epoch
+            "diam": (10**dp[j])*1e-9, # meters
+            "mean": res[0]["mean"],
+            "sigma": res[0]["sigma"], 
+            "amplitude": res[0]["amplitude"]
+        }
+
+        peaks.append(peak)
+
+        dp_str = f"{10**dp[j]:.3f}"
+        info_text_updates += f"Fitted: {dp_str} nm <br>"
+
+        info_div.text = info_text_updates
+
+    return peaks
 
 def update_peaks():
     global list_of_polygons
     global selected_polygon_index
     global mode_peaks_source
-    #global maxconc_peaks_source
+    global maxconc_peaks_source
 
     peak_mode_diams = []
     peak_mode_times = []
 
-#    peak_maxconc_diams = []
-#    peak_maxconc_times = []
+    peak_maxconc_diams = []
+    peak_maxconc_times = []
 
     for p in list_of_polygons:
         peak_mode_diams = peak_mode_diams + [params["diam"] for params in p["fit_mode_params"]]
         peak_mode_times = peak_mode_times + [params["time"] for params in p["fit_mode_params"]]
-#        peak_maxconc_diams = peak_maxconc_diams + [params["diam"] for params in p["fit_maxconc_params"]]
-#        peak_maxconc_times = peak_maxconc_times + [params["time"] for params in p["fit_maxconc_params"]]
+        peak_maxconc_diams = peak_maxconc_diams + [params["diam"] for params in p["fit_maxconc_params"]]
+        peak_maxconc_times = peak_maxconc_times + [params["time"] for params in p["fit_maxconc_params"]]
 
     mode_peaks_source.data = {
         "t": peak_mode_times,
         "d": peak_mode_diams
     }
-#    maxconc_peaks_source.data = {
-#        "t": peak_maxconc_times, 
-#        "d": peak_maxconc_diams
-#    }
+    maxconc_peaks_source.data = {
+        "t": peak_maxconc_times, 
+        "d": peak_maxconc_diams
+    }
+
+def update_dist_fits():
+    global df
+    global fig_dist
+    global list_of_polygons
+    global dist_fit_line_renderers
+    global fit_line_colors
+
+    if df is not None:
+
+        # Get the timestamp of the current distribution
+        dist_datetime = pd.to_datetime(fig_dist.title.text)
+
+        # Check if any of the fitted modes match the dist_datetime
+        timestamp_matches = False
+        for p in list_of_polygons:
+            for d in p["fit_mode_params"]:
+                if (pd.to_datetime(d["time"],unit="ms")==dist_datetime):
+                    timestamp_matches = True
+                    break
+            if timestamp_matches:
+                break
+
+        if timestamp_matches:
+            for dist_fit_line_renderer in dist_fit_line_renderers:
+                fig_dist.renderers.remove(dist_fit_line_renderer)
+            dist_fit_line_renderers = []
+        else:
+            return
+
+        y_data = df.columns.values.astype(float)
+ 
+        color_index = 0
+
+        # Check if any of the fits are going to go to the current distribution
+        for p in list_of_polygons:
+            for d in p["fit_mode_params"]:
+                if (pd.to_datetime(d["time"], unit="ms") == dist_datetime):
+                    dist_fit = afi.gaussian(np.log10(y_data*1e9), d["amplitude"], d["mean"], d["sigma"])
+                    renderer = fig_dist.line(
+                        'x',
+                        'y',
+                        source=ColumnDataSource(data=dict(x=y_data,y=dist_fit)),
+                        line_width=1,
+                        color=fit_line_colors[color_index % len(fit_line_colors)]
+                    )
+                    dist_fit_line_renderers.append(renderer)
+                    color_index += 1
+
 
 def do_fit_modes(event):
     # Run this when the fit modes button is pressed
@@ -221,47 +257,26 @@ def do_fit_modes(event):
 
         update_peaks()
 
-def do_fit_mode(event):
-    # Run this when the fit modes button is pressed
+        update_dist_fits()
+
+
+def do_fit_maxconc(event):
+    # Run this when the fit maxconc button is pressed
     global list_of_polygons
     global selected_polygon_index
     global df
-    global dist
 
     if selected_polygon_index is not None:
-        df_subset = dist.copy()
 
         polygon = list_of_polygons[selected_polygon_index]
+        
+        df_subset = find_df_in_polygon(df.copy(),polygon)
+        
+        peaks = fit_maxconc_method(df_subset)
 
-        df_subset.index =  (df_subset.index - pd.Timestamp("1970-01-01")) // pd.Timedelta("1ms")
-
-        # Do the fit to the dist        
-        peaks = fit_modes_method(df_subset)
-
-        # Update inside the selected polygon only the selected dist
-        for p in list_of_polygons[selected_polygon_index]["fit_mode_params"]:
-            if (p["time"]==peaks["time"]):
-                p = peaks
+        list_of_polygons[selected_polygon_index]["fit_maxconc_params"] = peaks
 
         update_peaks()
-
-#def do_fit_maxconc(event):
-#    # Run this when the fit maxconc button is pressed
-#    global list_of_polygons
-#    global selected_polygon_index
-#    global df
-#
-#    if selected_polygon_index is not None:
-#
-#        polygon = list_of_polygons[selected_polygon_index]
-#        
-#        df_subset = find_df_in_polygon(df.copy(),polygon)
-#        
-#        peaks = fit_maxconc_method(df_subset)
-#
-#        list_of_polygons[selected_polygon_index]["fit_maxconc_params"] = peaks
-#
-#        update_peaks()
 
 
 def remove_mode_fits_from_polygon(event):
@@ -296,18 +311,63 @@ def remove_mode_fit_from_polygon(event):
         # Remove the point from the plot
         update_peaks()
 
-#def remove_maxconc_fits_from_polygon(event):
-#    # a remove mode fits button is pressed
-#    global list_of_polygons
-#    global selected_polygon_index
-#
-#    if selected_polygon_index is not None:
-#
-#        # Empty the list containing the fitted parametrs
-#        list_of_polygons[selected_polygon_index]["fit_maxconc_params"] = []
-#
-#        # Remove the points from the plot
-#        update_peaks()
+def remove_maxconc_fits_from_polygon(event):
+    # a remove mode fits button is pressed
+    global list_of_polygons
+    global selected_polygon_index
+
+    if selected_polygon_index is not None:
+
+        # Empty the list containing the fitted parametrs
+        list_of_polygons[selected_polygon_index]["fit_maxconc_params"] = []
+
+        # Remove the points from the plot
+        update_peaks()
+
+
+def update_polygon_renderer():
+    global list_of_polygons
+    global polygon_background_source
+    global selected_polygon_index
+    
+    if selected_polygon_index is None:
+        loaded_data = {"xs": [polygon['x'] for polygon in list_of_polygons],
+                       "ys": [polygon['y'] for polygon in list_of_polygons],
+                       "fill_color": ["black" for polygon in list_of_polygons],
+                       "fill_alpha": [0.2 for polygon in list_of_polygons],
+                       "line_color": ["black" for polygon in list_of_polygons],
+                       "line_alpha": [1 for polygon in list_of_polygons]} 
+    else:
+        fill_colors = []
+        line_colors = []
+        fill_alphas = []
+        line_alphas = []
+        xs = []
+        ys = []
+        
+        for i in range(len(list_of_polygons)):
+            if (i==selected_polygon_index):
+                fill_colors.append("white")
+                fill_alphas.append(0.2)
+                line_colors.append("white")
+                line_alphas.append(1)
+            else:    
+                fill_colors.append("black")
+                fill_alphas.append(0.2)
+                line_colors.append("black")
+                line_alphas.append(1)
+            xs.append(list_of_polygons[i]["x"])
+            ys.append(list_of_polygons[i]["y"])
+        
+        loaded_data = {"xs": xs,
+                       "ys": ys,
+                       "fill_color": fill_colors,
+                       "fill_alpha": fill_alphas,
+                       "line_color": line_colors,
+                       "line_alpha": line_alphas} 
+     
+    polygon_background_source.data = loaded_data
+
 
 
 def update_selected_polygon(attr, old, new):
@@ -319,13 +379,12 @@ def update_selected_polygon(attr, old, new):
     global polygon_background_source
     global info_div
 
-
     # A polygon has been selected using the Tap tool
     if (len(new)==1):
         selection_id = new[0]
         selected_x = polygon_background_source.data["xs"][selection_id]
         selected_y = polygon_background_source.data["ys"][selection_id]
-        
+
         # Find the polygon based on the x coordinates
         for i in range(len(list_of_polygons)):
             if (list_of_polygons[i]['x'] == selected_x):
@@ -339,37 +398,25 @@ def update_selected_polygon(attr, old, new):
     else:
         selected_polygon_index = None
         info_div.text = f""
+    update_polygon_renderer()
 
 
-def update_polygon_renderer():
-    global list_of_polygons
-    global polygon_background_source
-    
-    loaded_data = {"xs": [polygon['x'] for polygon in list_of_polygons],
-                   "ys": [polygon['y'] for polygon in list_of_polygons]} 
- 
-    polygon_background_source.data = loaded_data
 
-
+# This is called when polygon is added
 def update_list_of_polygons(attr, old, new):
-    # When you create or remove polygons
     global list_of_polygons
     global polygon_source
+    global selected_polygon_index
+    global info_div
 
     new_x = new['xs']
-    old_x = old['xs']
+    #old_x = old['xs']
     new_y = new['ys']
-    old_y = old['ys']
+    #old_y = old['ys']
 
     # A polygon was added
     if len(new_x)>0:
-    # if (len(new_x)>len(old_x)):
-        #added_x = find_difference(new_x,old_x) 
-        #added_y = find_difference(new_y,old_y)
-
         polygon={}
-        #polygon["x"] = added_x
-        #polygon["y"] = added_y
         polygon["x"] = new_x[0]
         polygon["y"] = new_y[0]
         polygon["fit_mode_params"] = []
@@ -383,6 +430,44 @@ def update_list_of_polygons(attr, old, new):
 
     else:
         return
+
+# This is called when polygon (rectangle) is added
+def rect_to_update_list_of_polygons(attr, old, new):
+    global list_of_polygons
+    global rect_source
+
+    # Check if there is any data to convert
+    xs = rect_source.data.get('x', [])
+    ys = rect_source.data.get('y', [])
+    ws = rect_source.data.get('width', [])
+    hs = rect_source.data.get('height', [])
+
+    if not (len(xs) and len(ys) and len(ws) and len(hs)):
+        return
+
+    new_xs = []
+    new_ys = []
+    for x, y, w, h in zip(xs, ys, ws, hs):
+        half_w = w / 2
+        half_h = h / 2
+        # Create polygon (clockwise rectangle)
+        new_x = [x - half_w, x + half_w, x + half_w, x - half_w]
+        new_y = [y - half_h, y - half_h, y + half_h, y + half_h]
+        new_xs.append(new_x)
+        new_ys.append(new_y)
+
+    polygon = {}
+    polygon["x"] = new_xs[0]
+    polygon["y"] = new_ys[0]
+    polygon["fit_mode_params"] = []
+    polygon["fit_maxconc_params"] = []
+    polygon["label"] = ""
+    
+    list_of_polygons.append(polygon)
+    update_polygon_renderer()
+
+    # Clear rectangle drawing source
+    rect_source.data = dict(x=[], y=[], width=[], height=[])
 
 
 def load_aerosol_file(event):
@@ -400,12 +485,25 @@ def load_aerosol_file(event):
     f = aerosol_file_text_input.value 
 
     try:
-        df = pd.read_csv(f, index_col=0, parse_dates=True)
-
+        df = pd.read_csv(f, index_col=0, parse_dates=True) 
+        
+        diams = df.columns.astype(float).values
+        df.columns = diams
+        min_diam = np.min(diams)
+        max_diam = np.max(diams)
+        num_diams = len(diams) 
+        
+        new_diams = np.logspace(np.log10(min_diam),np.log10(max_diam),num_diams)
+        
+        df_interp = df.T
+        df_interp = df_interp.reindex(df_interp.index.union(new_diams)).sort_index()
+        df_interp = df_interp.interpolate(method='index', axis=0)
+        df = df_interp.loc[new_diams].T 
+     
         x = df.index.values
         y = df.columns.values.astype(float)
         z = df.values.astype(float).T
-
+     
         # Update the image
         data_source.data = dict(
             img=[z], 
@@ -413,7 +511,7 @@ def load_aerosol_file(event):
             y=[np.min(y)], 
             dw=[np.max(x)-np.min(x)], 
             dh=[np.max(y)-np.min(y)])
-
+     
         z_mask = np.empty(z.shape, dtype=np.uint32)
         view = z_mask.view(dtype=np.uint8).reshape((z.shape[0], z.shape[1], 4))
         view.fill(0)
@@ -424,19 +522,19 @@ def load_aerosol_file(event):
             y=[np.min(y)], 
             dw=[np.max(x)-np.min(x)], 
             dh=[np.max(y)-np.min(y)])
-
+     
         fig.x_range.start = np.min(x)
         fig.x_range.end = np.max(x)
         fig.y_range.start = np.min(y)
         fig.y_range.end = np.max(y)
-
+     
         # Clear the polygon data
         polygon_background_source.data = {"xs":[],"ys":[]} 
-
-        # Add the maxconc ploints
+     
+        # Add the maxconc points
         mode_peaks_source.data = {"t":[], "d":[]}
-        #maxconc_peaks_source.data = {"t":[], "d":[]}
-
+        # maxconc_peaks_source.data = {"t":[], "d":[]}
+     
         info_div.text = f"Loaded aerosol data from: {f}"
     except:
         info_div.text = f"Unable to load aerosol data from: {f}"
@@ -457,26 +555,34 @@ def update_clim(event):
     except:
         return
 
+def update_labels():
+    global list_of_polygons
+    global dropdown
+
+    unique_labels = list(np.unique([polygon["label"] for polygon in list_of_polygons if (polygon["label"]!="")]))
+    dropdown.options = unique_labels
+    dropdown.value = ""
+    add_option_text_input.value = ""
+
 def load_polygon_data(event):
     global list_of_polygons
     global polygon_source
     global json_load_text_input
     global info_div
+    global selected_polygon_index
 
     # Load the json file
     with open(json_load_text_input.value, 'r') as f:
         try: 
             list_of_polygons = json.load(f)
-    
-            # Extract the coordinates of the ROIs
-            loaded_data = {"xs": [polygon['x'] for polygon in list_of_polygons],
-                           "ys": [polygon['y'] for polygon in list_of_polygons]} 
-        
-            polygon_background_source.data = loaded_data
+
+            selected_polygon_index = None
 
             update_polygon_renderer()
 
             update_peaks()
+
+            update_labels()
 
             info_div.text=f"ROIs loaded from: {json_load_text_input.value}"
         except: 
@@ -505,12 +611,14 @@ def tap_callback(event):
     global dist_fit_line_renderers
     global fit_line_colors
 
-#    if is_check_dist:
     if df is not None:
 
         target_datetime = pd.to_datetime(event.x, unit='ms')
 
         closest_datetime = df.index[df.index<=target_datetime].max()
+
+        if pd.isna(closest_datetime):
+            return
 
         x_data = df.index.values
         y_data = df.columns.values.astype(float)
@@ -554,32 +662,6 @@ def tap_callback(event):
                     dist_fit_line_renderers.append(renderer)
                     color_index += 1
 
-
-#def toggle_check_dist(event):
-#    global is_check_dist
-#    global vline
-#    global fig_dist
-#    global mask_source
-#    global check_dist_button
-#    global dist_source
-#    global dist_fit_source
-#
-#    if is_check_dist:
-#        z_mask = mask_source.data["img"][0]
-#        z_mask.fill(0)
-#        mask_source.data["img"] = [z_mask]
-#        
-#        dist_source.data = dict(x=[], y=[])
-#        #dist_fit_source.data = dict(x=[], y=[])
-#
-#        fig_dist.title.text=f' '
-#        is_check_dist = False
-#        check_dist_button.button_type="danger"
-#    else:
-#        is_check_dist = True
-#        check_dist_button.button_type="success"
-
-
 def add_label(event):
     global list_of_polygons
     global selected_polygon_index
@@ -596,18 +678,21 @@ def add_label(event):
         Label: {list_of_polygons[selected_polygon_index]["label"]} \
         """
 
-
-def remove_selected_polygon(event):
+def remove_selected_polygon(attr,old,new):
     global list_of_polygons
     global selected_polygon_index
     global polygon_background_source
+    global info_div
 
     if selected_polygon_index is not None:
         del list_of_polygons[selected_polygon_index]
         update_polygon_renderer()
         update_peaks()
         selected_polygon_index = None
-    
+        info_div.text = ""
+        update_polygon_renderer()
+
+
 def add_option(event):
     global add_option_text_input
     global dropdown
@@ -624,8 +709,16 @@ def remove_option(event):
         dropdown.options.remove(add_option_text_input.value)
         add_option_text_input.value = ""
 
-#def on_cmap_select(event):
-#    #TODO Update to new colormap that was selected
+
+def on_cmap_select(attr, old, new):
+    global mapper
+
+    if new == "Turbo":
+        mapper.palette = Turbo256
+    elif new == "Inferno":
+        mapper.palette = Inferno256
+    elif new == "Cividis":
+        mapper.palette = Cividis256
 
 
 def close_app():
@@ -660,10 +753,13 @@ dist_fit_line_renderers = []
 
 polygon_source = ColumnDataSource(data=dict(xs=[], ys=[]))
 
-polygon_background_source = ColumnDataSource(data=dict(xs=[], ys=[]))
+polygon_background_source = ColumnDataSource(data=dict(xs=[], ys=[], fill_color=[], fill_alpha=[], line_color=[], line_alpha=[]))
+
+rect_source = ColumnDataSource(data=dict(x=[], y=[], width=[], height=[]))
 
 mode_peaks_source = ColumnDataSource(data = dict(t=[], d=[]))
-#maxconc_peaks_source = ColumnDataSource(data = dict(t=[], d=[]))
+maxconc_peaks_source = ColumnDataSource(data = dict(t=[], d=[]))
+
 
 # Create the surface plot figures
 fig = figure(
@@ -674,7 +770,7 @@ fig = figure(
     x_axis_label="Time",
     y_axis_label="Dp, [m]")
 
-mapper = LogColorMapper(palette=palette, low=10, high=10000)
+mapper = LogColorMapper(palette=Turbo256, low=10, high=10000)
 
 # Create the data image
 fig.image(image="img",
@@ -715,22 +811,40 @@ poly_renderer = fig.patches('xs', 'ys', source=polygon_source,
     line_color="black")
 
 poly_background_renderer = fig.patches('xs', 'ys', source=polygon_background_source, 
-    fill_color="black", 
+    fill_color="fill_color",
+    fill_alpha="fill_alpha",
+    line_color="line_color",
+    line_alpha="line_alpha",
+    line_width=1)
+
+rect_renderer = fig.rect(
+    'x',
+    'y',
+    'width',
+    'height',
+    source=rect_source,
+    fill_color="black",
     fill_alpha=0.2,
-    line_width=1,
-    line_color="black")
+    line_color="black",    
+)
+
+poly_background_renderer.nonselection_glyph = Patches(fill_color='fill_color', line_color='line_color', fill_alpha="fill_alpha")
 
 # Fitted mode peaks
-mode_peaks_glyph = Scatter(x="t", y="d", size=15, marker="dot", fill_color="black", line_color="black")
+mode_peaks_glyph = Scatter(x="t", y="d", size=5, marker="circle", fill_color="white", line_color="black")
 fig.add_glyph(mode_peaks_source, mode_peaks_glyph)
 
 # Fitted maxconc peaks
-#maxconc_peaks_glyph = Scatter(x="t", y="d", size=15, marker="dot", fill_color="black", line_color="black")
-#fig.add_glyph(maxconc_peaks_source, maxconc_peaks_glyph)
+maxconc_peaks_glyph = Scatter(x="t", y="d", size=5, marker="circle", fill_color="white", line_color="black")
+fig.add_glyph(maxconc_peaks_source, maxconc_peaks_glyph)
 
 # Draw tool for drawing the polygons
 draw_tool = FreehandDrawTool(renderers=[poly_renderer])
 fig.add_tools(draw_tool)
+
+# Add BoxSelectTool
+box_tool = BoxEditTool(renderers=[rect_renderer])
+fig.add_tools(box_tool)
 
 ## Add Tap tool
 tap_tool = TapTool(renderers=[poly_background_renderer])
@@ -754,6 +868,9 @@ fig.on_event('tap',tap_callback)
 # When we draw we want to launch the function to update polygons
 polygon_source.on_change('data', update_list_of_polygons)
 
+# Same if we draw a rectangle
+rect_source.on_change("data", rect_to_update_list_of_polygons)
+
 # Fit mode controls
 fit_modes_text_input = TextInput(placeholder = "Number of Modes", value="1", width=150, height=30)
 
@@ -766,15 +883,15 @@ fit_modes_button.on_event(ButtonClick, do_fit_modes)
 remove_modes_button.on_event(ButtonClick, remove_mode_fits_from_polygon)
 
 # Fit maxconc controls
-#fit_maxconc_button = Button(label="Fit maxconc", button_type="primary", width=150, height=30)
-#
-#remove_maxconc_button = Button(label="Clear maxconc fit", button_type="primary", width=150, height=30)
-#
-#fit_maxconc_button.on_event(ButtonClick, do_fit_maxconc)
-#
-#remove_maxconc_button.on_event(ButtonClick, remove_maxconc_fits_from_polygon)
-#
-#button_spacer = Spacer(width=160,height=30)
+fit_maxconc_button = Button(label="Fit maxconc", button_type="primary", width=150, height=30)
+
+remove_maxconc_button = Button(label="Clear maxconc fit", button_type="primary", width=150, height=30)
+
+fit_maxconc_button.on_event(ButtonClick, do_fit_maxconc)
+
+remove_maxconc_button.on_event(ButtonClick, remove_maxconc_fits_from_polygon)
+
+button_spacer = Spacer(width=160,height=30)
 
 # Load the aerosol data
 aerosol_file_button = Button(label="Load aerosol data", button_type="primary",height=30,width=150)
@@ -811,28 +928,16 @@ json_save_text_input = TextInput(placeholder="ROI filepath",height=30,width=310)
 
 json_save_button.on_event(ButtonClick, save_polygon_data)
 
-# Check individual distribution button
-#check_dist_button = Button(label="Show/Hide Distribution", button_type="danger",height=30,width=150)
-
-#check_dist_button.on_event(ButtonClick, toggle_check_dist)
-
-## Label ROIs 
-#label_text_input = TextInput(placeholder="ROI label", width=310, height=30)
-#
-#label_submit_button = Button(label="Submit Label",button_type="primary",height=30,width=150)
-#
-#label_submit_button.on_event(ButtonClick, add_label)
-
-
 # colormap dropdown
-cmap_dropdown = Select(value = "Turbo", options = ["Turbo","Plasma","Rainbow"], width=230, height=30)
+cmap_dropdown = Select(value = "Turbo", options = ["Turbo","Inferno","Cividis"], width=230, height=30)
 
 # Implement onSelect()
+cmap_dropdown.on_change('value', on_cmap_select)
 
 # Label select
 dropdown = Select(options = [], width=230, height=30)
 
-label_submit_button = Button(label="Submit Label",button_type="primary",height=30,width=150)
+label_submit_button = Button(label="Assign Label",button_type="primary",height=30,width=150)
 
 label_submit_button.on_event(ButtonClick, add_label)
 
@@ -846,13 +951,10 @@ remove_option_button = Button(label="Remove Label", button_type="primary", heigh
 
 remove_option_button.on_event(ButtonClick, remove_option)
 
-
-
-
-# Delete ROI button
-remove_selected_polygon_button = Button(label="Remove selected ROI", button_type="warning", height=30, width=150)
-
-remove_selected_polygon_button.on_event(ButtonClick, remove_selected_polygon)
+## Delete ROI button
+#remove_selected_polygon_button = Button(label="Remove selected ROI", button_type="warning", height=30, width=150)
+#
+#remove_selected_polygon_button.on_event(ButtonClick, remove_selected_polygon)
 
 # close the app button
 close_app_button = Button(label="Close App", button_type="danger")
@@ -866,12 +968,35 @@ info_div = Div(text="", width=470, height=120, styles={
     "border-radius": "5px",
     "padding": "10px"})
 
-title_div = Div(text="Aerosol Size Distribution GUI Tool", width=500, height=80, styles = {
+title_div = Div(text="Aerosol Size Distribution GUI Tool", width=500, height=50, styles = {
         "font-size": "30px",
         "font-weight": "bold",
         "display": "flex",
-        "align-items": "flex-end"
+        "align-items": "flex-start"
 })
+
+hotkey_div = Div(text='Press "x" to delete selected  ROI', width=470, height=60, styles = {
+        "display": "flex",
+        "align-items": "flex-start"
+})
+
+# Delete ROI by pressing "x"
+key_source = ColumnDataSource(data=dict(key=[]))
+
+# Watch for changes in key_source
+key_source.on_change('data', remove_selected_polygon)
+
+# JS to listen for key presses and update key_source
+key_listener = CustomJS(args=dict(source=key_source), code="""
+    document.addEventListener('keydown', function(event) {
+        if (event.key === 'x') {
+            source.data = {key: [...source.data.key, event.key]};
+            source.change.emit();
+        }
+    });
+""")
+
+fig.js_on_event('tap', key_listener) 
 
 # Make a layout
 layout = column(
@@ -886,10 +1011,9 @@ layout = column(
     fig,
     row(
         column(
-            #row(check_dist_button), 
-            row(remove_selected_polygon_button),
+            row(hotkey_div),
             row(fit_modes_text_input,fit_modes_button,remove_modes_button),
-            #row(button_spacer,fit_maxconc_button,remove_maxconc_button),
+            row(button_spacer,fit_maxconc_button,remove_maxconc_button),
             row(dropdown, add_option_text_input), 
             row(label_submit_button,add_option_button, remove_option_button),
             row(info_div),

@@ -11,8 +11,6 @@ columns : float
 values : float 
     normalized concentration, dN/dlogDp, cm-3
 
-
-
 """
 import numpy as np
 import pandas as pd
@@ -623,7 +621,7 @@ def diam2mob(dp,temp=293.15,pres=101325.0,ne=1):
 
     return Zp
 
-def mob2diam(Zp,temp=293.15,pres=101325.,ne=1, tol=1e-3, maxiter=20):
+def mob2diam(Zp,temp=293.15,pres=101325.,ne=1, tol=1e-3, maxiter=100):
     """
     Convert electrical mobility to electrical mobility diameter in air
 
@@ -993,9 +991,7 @@ def calc_formation_rate(
     dp1,
     dp2,
     gr,
-    coags = None,
-    temp=293.15,
-    pres=101325.):
+    sink_term):
     """
     Calculate particle formation rate
     
@@ -1004,72 +1000,67 @@ def calc_formation_rate(
     Parameters
     ----------
     
-    df : dataframe
-        Aerosol particle number size distribution
+    df : Dataframe (m rows)
+        Aerosol particle number size distribution 
+        Unit cm-3
     dp1 : float or series of length n
         Lower diameter of the size range(s)
         Unit m
     dp2 : float or series of length n
         Upper diameter of the size range(s)
         Unit m
-    gr : float or series of length n
-        Growth rate for particles out of the size range(s), 
-        unit nm h-1
-    coags : dataframe or None 
-        Coagulation sink of representative diameter, If `None` it is
-        calculated from the number size distribution
-        Unit: s-1
-    temp : float or series
-        Ambient temperature corresponding to the data, 
-        unit K
-    pres : float or series
-        Ambient pressure corresponding to the data
-        unit Pa
+    gr : float or Dataframe (n columns, m rows)
+        Growth rates
+        unit nm/h
+    sink_term : Dataframe (n columns, m rows) 
+        Flux of particles out of size range due to sink
+        Unit: cm-3 s-1
 
     Returns
     -------
 
-    dataframe
-        Particle formation rate(s) for the diameter range(s) 
-        Unit cm3 s-1
+    dict
+        Particle formation rate, dN/dt terms, sink terms
+        and GR terms for the diameter range(s)
+        Unit cm-3 s-1
 
     """
     
-    #dn = dndlogdp2dn(df)
-
-    #dp = df.columns.values.astype(float)
-
-    J = pd.DataFrame(index = df.index)
+    j_terms = pd.DataFrame(index = df.index)
+    gr_terms = pd.DataFrame(index = df.index)
+    sink_terms = pd.DataFrame(index = df.index)
+    conc_terms = pd.DataFrame(index = df.index)
 
     dp1 = pd.Series(dp1).values
     dp2 = pd.Series(dp2).values
-    gr = pd.Series(gr).values
-    temp = pd.Series(temp)
-    pres = pd.Series(pres)
+
+    if is_input_float([gr]):
+        gr = pd.DataFrame([gr])
 
     for i in range(len(dp1)):
-        #idx = np.argwhere((dp>=dp1[i]) & (dp<=dp2[i])).flatten()
         conc = calc_conc(df,dp1[i],dp2[i])
 
         # Conc term
         dt = df.index.to_frame().diff().values.astype("timedelta64[s]").astype(float).flatten()
         dt[dt<=0] = np.nan    
+        
         conc_term = conc.diff().values.flatten()/dt 
 
         # Sink term
-        if coags is None:
-            sink_term = calc_coags(df,np.sqrt(dp1[i]*dp2[i]),temp,pres).values.flatten() * conc.values.flatten()
-        else:
-            sink_term = coags.iloc[:,i].values.flatten()
+        sink_term = sink_term.iloc[:,i].values.flatten()
 
-        # GR term 
-        gr_term = (2.778e-13*gr[i])/(dp2[i]-dp1[i]) * conc.values.flatten()
+        # GR term
+        gr_term = (2.778e-13*gr.iloc[:,i].values.flatten())/(dp2[i]-dp1[i]) * conc.values.flatten()
         
+        # Formation rate
         formation_rate = conc_term + sink_term + gr_term
 
-        J.insert(i,i,formation_rate)
+        j_terms.insert(i,i,formation_rate)
+        gr_terms.insert(i,i,gr_term)
+        sink_terms.insert(i,i,sink_term)
+        conc_terms.insert(i,i,conc_term)
 
-    return J
+    return {"J":j_terms,"conc":conc_terms,"sink":sink_terms,"GR":gr_terms}
 
 def calc_ion_formation_rate(
     df_particles,
@@ -1079,8 +1070,8 @@ def calc_ion_formation_rate(
     dp2,
     gr_negions,
     gr_posions,
-    temp=293.15,
-    pres=101325.):
+    sink_term_negions,
+    sink_term_posions):
     """ 
     Calculate ion formation rate
     
@@ -1089,44 +1080,59 @@ def calc_ion_formation_rate(
     Parameters
     ----------
 
-    df_particles : dataframe
+    df_particles : dataframe with m rows
          Aerosol particle number size distribution   
-    df_negions : dataframe
+    df_negions : dataframe with m rows
         Negative ion number size distribution
-    df_posions : dataframe
+    df_posions : dataframe with m rows
         Positive ion number size distribution
     dp1 : float or series of length n
         Lower diameter of the size range(s), unit: m
     dp2 : float or series of length n
         Upper diameter of the size range(s), unit: m
-    gr_negions : float or series of length n
-        Growth rate for negative ions out of the size range(s), unit: nm h-1
-    gr_posions : float or series of length n
-        Growth rate for positive ions out of the size range(s), unit: nm h-1
-    temp : float or series
-        Ambient temperature corresponding to the data, unit: K
-    pres : or series
-        Ambient pressure corresponding to the data, unit: Pa
-
+    gr_negions : Float or DataFrame (n columns and m rows)
+        The negative ion GRs
+        unit nm h-1
+    gr_posions : Float or DataFrame (n columns and m rows)
+        The positive ion GRs
+        unit nm h-1
+    sink_term_negions : Dataframe (n columns and m rows)
+        Flux of negative ions out of the size range due to coagulation
+        Unit: cm-3 s-1
+    sink_term_posions : Dataframe (n columns and m rows)
+        Flux of positive ions out of the size range due to coagulation
+        Unit: cm-3 s-1
+ 
     Returns
     -------
 
-    dataframe
-        Negative ion formation rate(s), unit : cm3 s-1
-    dataframe  
-        Positive ion formation rate(s), unit: cm3 s-1
-
+    dict
+        Negative ion formation rate, dN/dt terms, sink terms,
+        GR terms, attachment terms and recombination terms 
+        for the diameter range(s)
+        Unit cm-3 s-1
+    dict  
+        Positive ion formation rate, dN/dt terms, sink terms,
+        GR terms, attachment terms and recombination terms 
+        for the diameter range(s)
+        Unit cm-3 s-1
+ 
     """
-
-    #dn_particles = dndlogdp2dn(df_particles)
-    #dn_negions = dndlogdp2dn(df_negions)
-    #dn_posions = dndlogdp2dn(df_posions)
-
-    #dp = df_negions.columns.values.astype(float)
+    
     time = df_negions.index
 
-    J_negions = pd.DataFrame(index = df_negions.index)
-    J_posions = pd.DataFrame(index = df_posions.index)
+    j_terms_negions = pd.DataFrame(index = df_negions.index)
+    j_terms_posions = pd.DataFrame(index = df_posions.index)
+    conc_terms_negions = pd.DataFrame(index = df_negions.index)
+    conc_terms_posions = pd.DataFrame(index = df_posions.index)
+    sink_terms_negions = pd.DataFrame(index = df_negions.index)
+    sink_terms_posions = pd.DataFrame(index = df_posions.index)
+    gr_terms_negions = pd.DataFrame(index = df_negions.index)
+    gr_terms_posions = pd.DataFrame(index = df_posions.index)
+    charging_terms_negions = pd.DataFrame(index = df_negions.index)
+    charging_terms_posions = pd.DataFrame(index = df_posions.index)
+    recombi_terms_negions = pd.DataFrame(index = df_negions.index)
+    recombi_terms_posions = pd.DataFrame(index = df_posions.index)
 
     # Constants
     alpha = 1.6e-6 # cm3 s-1
@@ -1134,21 +1140,18 @@ def calc_ion_formation_rate(
 
     dp1=pd.Series(dp1).values
     dp2=pd.Series(dp2).values
-    gr_negions=pd.Series(gr_negions).values
-    gr_posions=pd.Series(gr_posions).values
 
-    temp = pd.Series(temp)
-    pres = pd.Series(pres)
+    if is_input_float([gr_negions,gr_posions]):
+        gr_negions = pd.DataFrame([gr_negions])
+        gr_posions = pd.DataFrame([gr_posions])
 
     for i in range(len(dp1)):
-        #idx = np.argwhere((dp>=dp1[i]) & (dp<=dp2[i])).flatten()
-
         conc_negions = calc_conc(df_negions,dp1[i],dp2[i])
         conc_posions = calc_conc(df_posions,dp1[i],dp2[i])
 
         # Sink terms
-        sink_term_negions = calc_coags(df_particles,np.sqrt(dp1[i]*dp2[i]),temp,pres).values.flatten() * conc_negions.values.flatten()
-        sink_term_posions = calc_coags(df_particles,np.sqrt(dp1[i]*dp2[i]),temp,pres).values.flatten() * conc_posions.values.flatten()
+        sink_term_negions = sink_term_negions.iloc[:,i].values.flatten()
+        sink_term_posions = sink_term_posions.iloc[:,i].values.flatten()
 
         # Conc terms
         dt = time.to_frame().diff().values.astype("timedelta64[s]").astype(float).flatten()
@@ -1157,8 +1160,8 @@ def calc_ion_formation_rate(
         conc_term_posions = conc_posions.diff().values.flatten()/dt
  
         # GR terms
-        gr_term_negions = (2.778e-13*gr_negions[i])/(dp2[i]-dp1[i]) * conc_negions.values.flatten()
-        gr_term_posions = (2.778e-13*gr_posions[i])/(dp2[i]-dp1[i]) * conc_posions.values.flatten()
+        gr_term_negions = (2.778e-13*gr_negions.iloc[:,i].values.flatten())/(dp2[i]-dp1[i]) * conc_negions.values.flatten()
+        gr_term_posions = (2.778e-13*gr_posions.iloc[:,i].values.flatten())/(dp2[i]-dp1[i]) * conc_posions.values.flatten()
 
         # Recombination terms
         conc_small_negions = calc_conc(df_negions,0.5e-9,dp1[i])
@@ -1175,11 +1178,38 @@ def calc_ion_formation_rate(
         formation_rate_negions = conc_term_negions + sink_term_negions + gr_term_negions + recombi_term_negions - charging_term_negions
         formation_rate_posions = conc_term_posions + sink_term_posions + gr_term_posions + recombi_term_posions - charging_term_posions
 
-        J_negions.insert(i, i, formation_rate_negions)
-        J_posions.insert(i, i, formation_rate_posions)
+        j_terms_negions.insert(i, i, formation_rate_negions)
+        j_terms_posions.insert(i, i, formation_rate_posions)
+        conc_terms_negions.insert(i, i, conc_term_negions)
+        conc_terms_posions.insert(i, i, conc_term_posions)
+        sink_terms_negions.insert(i, i, sink_term_negions)
+        sink_terms_posions.insert(i, i, sink_term_posions)
+        gr_terms_negions.insert(i, i, gr_term_negions)
+        gr_terms_posions.insert(i, i, gr_term_posions)
+        charging_terms_negions.insert(i, i, charging_term_negions)
+        charging_terms_posions.insert(i, i, charging_term_posions)
+        recombi_terms_negions.insert(i, i, recombi_term_negions)
+        recombi_terms_posions.insert(i, i, recombi_term_posions)
 
-    return J_negions, J_posions
+    results_negions = {
+        "J":j_terms_negions,
+        "conc":conc_terms_negions,
+        "sink":sink_terms_negions,
+        "GR":gr_terms_negions,
+        "Attach":charging_terms_negions,
+        "Recombi":recombi_terms_negions
+        }
 
+    results_posions = {
+        "J":j_terms_posions,
+        "conc":conc_terms_posions,
+        "sink":sink_terms_posions,
+        "GR":gr_terms_posions,
+        "Attach":charging_terms_posions,
+        "Recombi":recombi_terms_posions 
+        }
+
+    return results_negions, results_posions
 
 def tubeloss(diam, flowrate, tubelength, temp=293.15, pres=101325.):
     """
@@ -2155,30 +2185,36 @@ def nanoranking(df, dmin, dmax, row_threshold=0, col_threshold=0):
 def normalize_signal(signal):
     return (signal - np.min(signal)) / (np.max(signal) - np.min(signal))
 
-def normalized_cross_correlation(x, y):
-    # Remove means
-    x_mean = np.mean(x)
-    y_mean = np.mean(y)
-    x_zero_mean = x - x_mean
-    y_zero_mean = y - y_mean
-    
-    # Compute cross-correlation
-    corr = correlate(x_zero_mean, y_zero_mean, mode='same', method='auto')
-    
-    # Normalize by product of standard deviations and length
-    norm_factor = len(x) * np.std(x) * np.std(y)
-    normalized_corr = corr / norm_factor
 
-    # Find the number of shifts
-    mid = len(x) // 2
-    if len(x) % 2 == 0:
-        lags = np.arange(-mid + 1, mid + 1)
-    else:
-        lags = np.arange(-mid, mid + 1)
+def normalized_cross_correlation(x, y):
+    x_normalized = (x - np.mean(x))/np.std(x)
+    y_normalized = (y - np.mean(y))/np.std(y)
     
+    # Compute the full cross-correlation
+    corr = correlate(x_normalized, y_normalized, mode='full')
+
+    # Compute the lags and the amount of overlap at each lag
+    n = len(x)
+    lags = np.arange(-n + 1, n)
+    overlap = n - np.abs(lags)
+
+    # Normalize by product of standard deviations and length
+    normalized_corr = corr / overlap
+
     return lags, normalized_corr
 
-def cross_corr_gr(df, dmin, dmax, window_width_hours=3.0, row_threshold=0.0, col_threshold=0.0):
+
+def cross_corr_gr(
+    df, 
+    dmin, 
+    dmax, 
+    smoothing_window=3.0,
+    tau_window=22.0, 
+    number_of_divisions=1, 
+    row_threshold=0.0, 
+    col_threshold=0.0,
+    data_reso=1.0,
+    verbose=False):
     """
     Calculate GR using cross-correlation method
 
@@ -2193,10 +2229,17 @@ def cross_corr_gr(df, dmin, dmax, window_width_hours=3.0, row_threshold=0.0, col
         Upper size limit for GR
     smoothing_window : float
         Window length used in smoothing the data in hours
+    tau_window : float
+        Range of time lags used in hours
     row_threshold : float
         Maximum fraction of NaNs present in the rows
     col_thershold : float
         Maximum fraction of NaNs present in the columns
+    data_reso : float
+        Resolution in hours
+    verbose : boolean
+        If True then GR, lags and cross correlations are returned
+        If False then only GR is returned
 
     Returns
     -------
@@ -2204,85 +2247,131 @@ def cross_corr_gr(df, dmin, dmax, window_width_hours=3.0, row_threshold=0.0, col
     dictionary
         Results in a dictionary:
 
+        If verbose is True
+
+        `gr`: growth rate in nm/h
+        `lags`: lags in seconds
+        `corrs`: cross correlations
+
+        If verbose is False
         `gr`: growth rate in nm/h
 
-        `lags`: time shifts applied in seconds
-        
-        `corrs`: correlation coefficicients for the lags
-
-        `max_corr_lag`: time shift with maximum correlation
-
-        `max_corr`: the value of the maximum correlation
-
-        `channels`: concentration in the two size channels normalized between 0 and 1
 
     """ 
+    
     # Filter out rows with too many NaNs
-    df = filter_nans(df, threshold=col_threshold, axis=1)    
-    df = filter_nans(df, threshold=row_threshold, axis=0)    
+    #df = filter_nans(df, threshold=col_threshold, axis=1)    
+    #df = filter_nans(df, threshold=row_threshold, axis=0)    
 
-    if df.empty:
-        return None
+    # If only empty is left return bad data
+    #if df.empty:
+    #    return -999
 
-    # Then filter out the nans from the whole data frame
+    # We assume we get 24 hours of data
+
+    # First extract the data in the size range
+    diams = df.columns.astype(float).values
+
+    if ((dmin<np.min(diams)) | (dmax>np.max(diams))):
+        return -999
+    
+    # Find indices where values are in range (low, high)
+    in_range_idx = np.where((diams > dmin) & (diams < dmax))[0]
+
+    # Include 1 around each index
+    expanded_idx = np.unique(np.concatenate([in_range_idx - 1, in_range_idx, in_range_idx + 1]))
+
+    # Clip indices to stay within bounds of array
+    expanded_idx = expanded_idx[(expanded_idx >= 0) & (expanded_idx < len(diams))]
+
+    df_in_range = df.iloc[:,expanded_idx]
+
+    if np.any((df_in_range.isnull().mean(axis=0)>=row_threshold).values):
+        return -999
+    if np.any((df_in_range.isnull().mean(axis=1)>=col_threshold).values):
+        return -999
+
+    # Check that duration is close enough to 24 hours
+    if (df.index.is_monotonic_increasing==False):
+        return -999
+
+    if ((df.shape[0]/data_reso) < (23.0/data_reso)):
+        return -999
+
+    # Filter out the nans from the whole data frame
     df = denan(df)
 
-    # Find the resolution and determine the window length
-    time_diffs = df.index.to_series().diff().dropna()
-    mean_timestep_hours = time_diffs.mean().total_seconds() / 3600.
-    window_length = np.round(window_width_hours / mean_timestep_hours)
-
-    if np.isnan(window_length):
-        return None
-    else:
-        window_length = int(window_length)
+    window_length = int(np.round(smoothing_window/data_reso))
 
     # Smooth the signals
-    df = df.rolling(window=window_length, min_periods=1).mean()
+    df = df.rolling(window=window_length, min_periods=1, center=True).mean()
 
-    # Interpolate to dmin and dmax
-    logdp = np.log10(df.columns.astype(float).values)
+    logdp = np.log10(diams)
 
-    dp_grid = np.array([np.log10(dmin),np.log10(dmax)])
+    # Divide the size range into smaller size ranges
+    step_size = (np.log10(dmax)-np.log10(dmin))/number_of_divisions
     
-    data_interp = np.nan*np.ones((df.shape[0],2))
-    for j in range(df.shape[0]):
-        data_interp[j,:] = np.interp(dp_grid,logdp,df.iloc[j,:].values)
+    d1 = dmin
+    d2 = 10**(np.log10(dmin) + step_size)
+    tau_max_tot = 0
+    corr_max_tot = 0
 
-    # Interpolate to dense time grid
-    t = (df.index-df.index[0]).total_seconds().values
-    
-    t_grid = np.arange(0,t[-1]+1)
-    
-    data_interp2 = np.nan*np.ones((len(t_grid),data_interp.shape[1]))
-    for j in range(data_interp.shape[1]):
-        data_interp2[:,j] = np.interp(t_grid,t,data_interp[:,j])
+    for i in range(number_of_divisions):
 
-    # Between 0 and 1
-    channel1=normalize_signal(data_interp2[:,0])
-    channel2=normalize_signal(data_interp2[:,1])
-    
-    # Calculate cross correlation
-    lag, corr = normalized_cross_correlation(channel1,channel2)
-    
-    max_corr_lag = -lag[np.argmax(corr)] # seconds
-    max_lag = np.max(lag)
-    max_corr = np.max(corr)
+        # Interpolate diameters
+        dp_grid = np.array([np.log10(d1),np.log10(d2)])
+        
+        data_interp = np.nan*np.ones((df.shape[0],2))
+        for j in range(df.shape[0]):
+            data_interp[j,:] = np.interp(dp_grid,logdp,df.iloc[j,:].values)
 
-    if ((max_corr_lag>0) & (max_corr_lag<max_lag)):
-        gr = (dmax-dmin)*1e9/(max_corr_lag/(60*60)) # nm/h
+        #print(data_interp)
+
+        # Interpolate to dense time grid 1s
+        t = (df.index-df.index[0]).total_seconds().values
+        
+        t_grid = np.arange(0,t[-1]+1)
+        
+        data_interp2 = np.nan*np.ones((len(t_grid),data_interp.shape[1]))
+        for j in range(data_interp.shape[1]):
+            data_interp2[:,j] = np.interp(t_grid,t,data_interp[:,j])
+    
+        #print(data_interp2)
+
+        channel1=data_interp2[:,0].flatten()
+        channel2=data_interp2[:,1].flatten()
+
+        lag, corr = normalized_cross_correlation(channel1,channel2)
+    
+        # minimize edge effect by skipping hours at the ends
+        edge_skip = int((60*60*24 - 60*60*tau_window)/2)
+        lag = lag[edge_skip:-edge_skip]
+        corr = corr[edge_skip:-edge_skip]
+
+        tau_max = -lag[np.argmax(corr)] # seconds
+        corr_max = np.max(corr)
+        max_lag = np.max(-lag)
+
+        # sanity check the tau_max
+        if ((tau_max>0)&(tau_max<max_lag)):
+            tau_max_tot += tau_max
+            corr_max_tot += corr_max
+        elif (tau_max==0):
+            return -888
+        elif (tau_max<0):
+            return -777
+        elif (tau_max==max_lag):
+            return -666
+        else:
+            return -555
+
+        d1 = d2
+        d2 = 10**(np.log10(d1) + step_size)
+
+    gr = (dmax-dmin)*1e9/((tau_max_tot)/(60*60)) #nm h-1
+    cm = float(corr_max_tot)/float(number_of_divisions)
+
+    if verbose:
+        return {"gr":gr,"lag":-lag,"corr":corr}
     else:
-        gr=np.nan
-
-    channels = pd.DataFrame(index=t_grid,data={dmin:channel1,dmax:channel2})
-
-    result = {
-        "gr": gr,
-        "lags": lag,
-        "corrs": corr,
-        "max_corr_lag": max_corr_lag,
-        "max_corr": max_corr,
-        "channels": channels
-    }
-     
-    return result 
+        return {"gr":gr}

@@ -187,7 +187,7 @@ def generate_timeticks(
     return minor_ticks,major_ticks,major_ticklabels
 
 
-def generate_log_ticks(min_exp,max_exp):
+def generate_log_ticks(min_exp,max_exp,minor=False):
     """
     Generate ticks and ticklabels for log axis
 
@@ -216,17 +216,34 @@ def generate_log_ticks(min_exp,max_exp):
     log_minorticks=[]
     log_majorticks=[]
     log_majorticklabels=[]
+    log_minorticklabels=[]
     for j in y:
         for i in x:
             log_minorticks.append(np.log10(np.round(i*10**j,int(np.abs(j)))))
             if i==1:
-                log_majorticklabels.append("10$^{%d}$"%j)
-                log_majorticks.append(np.log10(np.round(i*10**j,int(np.abs(j)))))
+                if minor:
+                    if j>-1:
+                        log_majorticklabels.append(f"{10**np.log10(np.round(i*10**j,int(np.abs(j)))):.0f}")
+                    else:
+                        format_specifier = f'.{np.abs(np.log10(10**j)):.0f}f'
+                        log_majorticklabels.append(f"{10**np.log10(np.round(i*10**j,int(np.abs(j)))):{format_specifier}}")                    
+                    log_majorticks.append(np.log10(np.round(i*10**j,int(np.abs(j)))))
+                else:
+                    log_majorticklabels.append("10$^{%d}$"%j)
+                    log_majorticks.append(np.log10(np.round(i*10**j,int(np.abs(j))))) 
+            elif minor:
+                if j>-1:
+                    log_minorticklabels.append(f"{10**np.log10(np.round(i*10**j,int(np.abs(j)))):.0f}")
+                else:
+                    format_specifier = f'.{np.abs(np.log10(10**j)):.0f}f'
+                    log_minorticklabels.append(f"{10**np.log10(np.round(i*10**j,int(np.abs(j)))):{format_specifier}}")
+            else:
+                pass
 
     log_minorticks=np.array(log_minorticks)
     log_minorticks=log_minorticks[log_minorticks<=max_exp]
     log_majorticks=np.array(log_majorticks)
-    return log_minorticks,log_majorticks,log_majorticklabels
+    return log_minorticks,log_majorticks,log_majorticklabels,log_minorticklabels
 
 def subplot_aerosol_dist(
     vlist,
@@ -343,7 +360,7 @@ def subplot_aerosol_dist(
     first_col_ax = ax_row[::columns]
     first_row_ax = ax_row[:columns]
     
-    log_minorticks,log_majorticks,log_majorticklabels = generate_log_ticks(-10,-4)
+    log_minorticks,log_majorticks,log_majorticklabels,_ = generate_log_ticks(-10,-4)
     
     for i in np.arange(len(ax_row)):
         
@@ -499,7 +516,7 @@ def plot_aerosol_dist(
     handle.set_xticks(time_majorticks)
     handle.set_xticklabels(time_ticklabels)
     
-    log_minorticks,log_majorticks,log_majorticklabels = generate_log_ticks(-10,-4)
+    log_minorticks,log_majorticks,log_majorticklabels,_ = generate_log_ticks(-10,-4)
     handle.set_yticks(log_minorticks,minor=True)
     handle.set_yticks(log_majorticks)
     handle.set_yticklabels(log_majorticklabels)

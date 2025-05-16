@@ -4,27 +4,32 @@ import numpy as np
 import pandas as pd
 import aerosol.functions as af
 from scipy.optimize import curve_fit
-
+from joblib import Parallel, delayed
+import time
+from sklearn.metrics import mean_squared_error
+from scipy.signal import savgol_filter
 
 def to_meters(x):
     return (10**x)*1e-9
 
-def fit_gmm(samples,n_components,coef,means_init,weights_init):
+def fit_gmm_and_aic(n, samples):
+    gmm = GaussianMixture(n_components=n)
+    gmm.fit(samples.reshape(-1,1))
+    return gmm.aic(samples.reshape(-1,1))
 
-    if means_init is None and weights_init is None:
-        gmm = GaussianMixture(n_components=n_components)
-    else:
-        gmm = GaussianMixture(
-            n_components=n_components,
-            means_init=means_init.reshape(-1,1),
-            weights_init=weights_init)
+def gaussian(x, amplitude, mean, sigma):
+    return amplitude * 1.0/(sigma * np.sqrt(2.0 * np.pi)) * np.exp(-0.5 * ((x - mean) / sigma) ** 2.0)
+
+def fit_gmm(samples,n_components,coef):
+
+    gmm = GaussianMixture(n_components=n_components)
     
     gmm.fit(samples.reshape(-1,1))
 
     weights = gmm.weights_
     means = gmm.means_[:,0]
     stddevs = np.array([np.sqrt(c[0,0]) for c in gmm.covariances_])
-
+    
     gaussians = []
     for i in range(n_components):
         
@@ -36,9 +41,6 @@ def fit_gmm(samples,n_components,coef,means_init,weights_init):
         gaussians.append(gaussian)
 
     return gaussians
-
-def gaussian(x, amplitude, mean, sigma):
-    return amplitude * 1.0/(sigma * np.sqrt(2.0 * np.pi)) * np.exp(-0.5 * ((x - mean) / sigma) ** 2.0)
 
 def multimodal_gaussian(x, *params):
     n_components = len(params) // 3
@@ -57,7 +59,7 @@ def calc_pred(x,gaussians):
 
     return list(pred)
 
-def fit_multimodal_gaussian_kde(data_x, data_y, gaussians):
+def fit_multimodal_gaussian(data_x, data_y, gaussians):
     initial_guesses = []
     lower_bounds = []
     upper_bounds = []
@@ -70,7 +72,7 @@ def fit_multimodal_gaussian_kde(data_x, data_y, gaussians):
 
         lower_bounds.append(1)
         lower_bounds.append(-np.inf)
-        lower_bounds.append(0.05)        
+        lower_bounds.append(-np.inf)        
         upper_bounds.append(np.inf)
         upper_bounds.append(np.inf)
         upper_bounds.append(np.inf)
@@ -83,7 +85,7 @@ def fit_multimodal_gaussian_kde(data_x, data_y, gaussians):
             data_x,
             data_y,
             p0=initial_guesses,
-            bounds=(lower_bounds,upper_bounds)
+            bounds=(lower_bounds,upper_bounds),
         )
     except:
         return None
@@ -139,22 +141,23 @@ def calc_conc_gaus(x,gaussians):
         mode_concs.append(mode_conc)
     return mode_concs
 
-def remove_far_peaks(x,gaussians):
-    valid_gaussians = []
-    for g in gaussians:
-        if ((g["mean"]>(x.max()+0.5)) | (g["mean"]<(x.min()-0.5))):
-            continue
+def find_final_gaussians(gaussians_gmm, gaussians_lsq, n_modes, x_data, method):
+    x_max = x_data.max()
+    x_min = x_data.min()
+    gaussians = []
+
+    for i in range(n_modes):
+        if ((gaussians_lsq[i]["mean"]>x_max) | (gaussians_lsq[i]["mean"]<x_min)):
+            gaussians.append(gaussians_lsq[i])
         else:
-            valid_gaussians.append(g)
-    return valid_gaussians
+            if method=="cluster":
+                gaussians.append(gaussians_gmm[i])
+            if method=="lsqr":
+                gaussians.append(gaussians_lsq[i])
 
-def has_too_close_peaks(gaussians, min_distance=0.2):
-    peak_positions = np.array([g["mean"] for g in gaussians])
-    peak_positions = np.sort(peak_positions)  # Sort the numbers
-    peak_position_differences = np.diff(peak_positions)  # Compute consecutive differences
-    return np.any(peak_position_differences < min_distance)
+    return gaussians
 
-def fit_multimode(x, y, timestamp, n_modes = None, n_samples = 10000):
+def fit_multimode(x, y, timestamp, n_modes = None, n_samples = 10000, method="cluster"):
     """
     Fit multimodal Gaussian to aerosol number-size distribution
 
@@ -172,11 +175,14 @@ def fit_multimode(x, y, timestamp, n_modes = None, n_samples = 10000):
     n_samples : int
         Number of samples to draw from the distribution
         during the fitting process.
+    method : str
+        `cluster` clustering (gaussian mixture)
+        `lsqr` least-squares
     
     Returns
     -------
 
-    `dict`:
+    dictionary:
         Fit results
 
     """
@@ -196,8 +202,11 @@ def fit_multimode(x, y, timestamp, n_modes = None, n_samples = 10000):
 
     all_ok = True
 
-    # There should be at least 3 points available
-    if len(x_interp)<3:
+    sensitivity = 3
+
+    aic_scores = []
+
+    if len(x_interp)<5:
         all_ok = False
     else:
         coef = np.trapz(y_interp,x_interp)
@@ -205,92 +214,80 @@ def fit_multimode(x, y, timestamp, n_modes = None, n_samples = 10000):
 
     if ((n_modes is None) and all_ok):
 
-        scores = []
-        n_range = []
-        for n in range(1,9):
-            gaussians_gmm = fit_gmm(samples, n, coef, None, None)
-            gaussians_lsq = fit_multimodal_gaussian_kde(x_interp, y_interp, gaussians_gmm)
-            
-            if ((gaussians_lsq is None) & (len(scores)==0)):
-                continue
-            elif gaussians_lsq is None:
-                scores.append(scores[-1])
-                n_range.append(n)
-            else:
-                pred = calc_pred(x_interp,gaussians_lsq)
-                score = mse(pred,y_interp)
-                if len(scores)>0:
-                    if score > scores[-1]:
-                        scores.append(scores[-1])
-                    else:
-                        scores.append(score)
-                else:
-                    scores.append(score)
-                n_range.append(n)
+        windo = int(0.41/np.mean(np.diff(x_interp)))
 
-        sensitivity = 3
-        
-        kneedle = KneeLocator(n_range, scores, curve="convex", direction="decreasing", S=sensitivity)
+        y_smooth = savgol_filter(y_interp, window_length=windo, polyorder=1)
 
-        if kneedle.elbow is None:
+        samples_smooth = af.sample_from_dist(x_interp,y_smooth,n_samples)
+
+        n_range = np.arange(1,10)
+
+        aic_scores = Parallel(n_jobs=-1)(delayed(fit_gmm_and_aic)(n, samples_smooth) for n in n_range)
+
+        aic_kneedle = KneeLocator(n_range, 
+            aic_scores, curve="convex", 
+            direction="decreasing", S=sensitivity)
+
+        if (aic_kneedle.elbow is None):
             print("kneedle was none")
             all_ok = False
+        else:           
+            n_modes = aic_kneedle.elbow
 
-        else:
-                
-            n_modes = kneedle.elbow
             # Do the fit using GMM and least squares
-            gaussians_gmm = fit_gmm(samples, n_modes, coef, None, None)
+            gaussians_gmm = fit_gmm(samples, n_modes, coef)
         
-            # use it as initial guess for least squares fit
-            gaussians_lsq = fit_multimodal_gaussian_kde(x_interp, y_interp, gaussians_gmm)
+            gaussians_lsq = fit_multimodal_gaussian(x_interp, y_interp, gaussians_gmm)
 
             if gaussians_lsq is None:
-                print("final fit was none")
                 all_ok = False
-            else:  
-              while True:
-                  if has_too_close_peaks(gaussians_lsq):
-                      n_modes = n_modes-1
-                      gaussians_gmm = fit_gmm(samples, n_modes, coef, None, None)
-                      gaussians_lsq = fit_multimodal_gaussian_kde(x_interp, y_interp, gaussians_gmm)
-                      if gaussians_lsq is None:
-                          break
-                  else:
-                      break
+                print("LSQ failed")
+            else:
+                gaussians = find_final_gaussians(gaussians_gmm, gaussians_lsq, n_modes, x_interp, method)
 
-              if gaussians_lsq is not None:
-                  gaussians = remove_far_peaks(x_interp,gaussians_lsq)
-                  if len(gaussians)==0:
-                      print("final number of gaussians was zero")
-                      all_ok = False
-              else:
-                  print("final fit was none")
-                  all_ok = False
     elif ((n_modes is not None) and all_ok):
-        gaussians_gmm = fit_gmm(samples, n_modes, coef, None, None)
-        gaussians = fit_multimodal_gaussian_kde(x_interp, y_interp, gaussians_gmm)
-        if gaussians is None:
-            print("fit was none")
+        gaussians_gmm = fit_gmm(samples, n_modes, coef)
+        gaussians_lsq = fit_multimodal_gaussian(x_interp, y_interp, gaussians_gmm)
+        if gaussians_lsq is None:
+            print("LSQ failed")
             all_ok = False
+        else:
+            gaussians = find_final_gaussians(gaussians_gmm, gaussians_lsq, n_modes, x_interp, method)
     else:
         pass
 
     if all_ok:
-        # Make sure all the data is json compatible
-        dp = get_peak_positions(gaussians)
-        predicted_ndist = calc_pred(x,gaussians)
-        predicted_gaussians = calc_pred_gaussians(x,gaussians)
-        total_conc = calc_conc_ndist(x,predicted_ndist)
-        mode_concs = calc_conc_gaus(x,gaussians)
-        diams = list(x)
-        if isinstance(timestamp, str):
-            time = timestamp
-        else:    
-            time = timestamp.strftime("%Y-%m-%d %H:%M:%S")   
+        try:
+            # Make sure all the data is json compatible
+            dp = get_peak_positions(gaussians)
+            predicted_ndist = calc_pred(x,gaussians)
+            predicted_gaussians = calc_pred_gaussians(x,gaussians)
+            total_conc = calc_conc_ndist(x,predicted_ndist)
+            mode_concs = calc_conc_gaus(x,gaussians)
+            diams = list(x)
+            if isinstance(timestamp, str):
+                time = timestamp
+            else:    
+                time = timestamp.strftime("%Y-%m-%d %H:%M:%S")
+        except:
+            dp = []
+            gaussians = []
+            gaussians_gmm = []
+            gaussians_lsq = []
+            diams = list(x)
+            predicted_ndist = [] 
+            predicted_gaussians = []
+            total_conc = np.nan
+            mode_concs = [np.nan]
+            if isinstance(timestamp, str):
+                time = timestamp
+            else:    
+                time = timestamp.strftime("%Y-%m-%d %H:%M:%S")            
     else:
         dp = []
         gaussians = []
+        gaussians_gmm = []
+        gaussians_lsq = []
         diams = list(x)
         predicted_ndist = [] 
         predicted_gaussians = []
@@ -312,11 +309,12 @@ def fit_multimode(x, y, timestamp, n_modes = None, n_samples = 10000):
         "predicted_gauss": predicted_gaussians,
         "total_conc": total_conc,
         "mode_concs": mode_concs,
+        "aic_scores":aic_scores,
     }
 
     return result
 
-def fit_multimodes(df, n_modes = None, n_samples = 10000):
+def fit_multimodes(df, n_modes = None, n_samples = 10000, method = "cluster"):
     """
     Fit multimodal Gaussian to a aerosol number size distribution (dataframe)
 
@@ -326,7 +324,8 @@ def fit_multimodes(df, n_modes = None, n_samples = 10000):
     df : pandas DataFrame
         Aerosol number size distribution
     n_modes : int or `None`
-        number of modes to fit, if `None` the number is determined using automatic method for each timestamp
+        Number of modes to fit, if `None` the number is 
+        determined using automatic method for each timestamp
     n_samples : int
         Number of samples to draw from the distribution
         during the fitting process.
@@ -336,23 +335,30 @@ def fit_multimodes(df, n_modes = None, n_samples = 10000):
 
     list:
         List of fit results
+    list:
+        List of elapsed times for each fit
 
     """
-    # Remove all nan rows
+
     df = df.dropna(how="all",axis=0)
 
     x = np.log10(df.columns.values.astype(float)*1e9)
+    
     fit_results = []
+    elapsed_times = []
+    
     for j in range(df.shape[0]):
         y = df.iloc[j,:].values.flatten()
+        start = time.time()
         fit_result = fit_multimode(x, y, df.index[j], n_modes = n_modes, n_samples = n_samples)
-        
+        end = time.time()
+
         fit_results.append(fit_result)
+        elapsed_times.append(end-start)
         
         if (fit_result["number_of_gaussians"]>0):
-            print(f'{df.index[j]}: found {fit_result["number_of_gaussians"]} modes')
+            print(f'{df.index[j]}: found {fit_result["number_of_gaussians"]} modes in {end-start:.4f} seconds')
         else:
-            print(f'{df.index[j]}: found {fit_result["number_of_gaussians"]} modes')
+            print(f'{df.index[j]}: found {fit_result["number_of_gaussians"]} modes in {end-start:.4f} seconds')
 
-    return fit_results
-
+    return fit_results,elapsed_times

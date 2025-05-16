@@ -2,7 +2,7 @@
 
 This package is a collection of tools to analyze and visualize atmospheric aerosol and ion data.
 
-Latest version: 0.1.12
+Latest version: 0.1.13
 
 ## Installation
 
@@ -10,6 +10,12 @@ Install directly from GitHub using `pip`
 
 ```bash
 pip install git+https://github.com/jlpl/aerosol-functions.git
+```
+
+Install from PYPI:
+
+```bash
+pip install aerosol-functions
 ```
 
 ## Documentation
