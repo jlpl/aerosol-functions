@@ -6,16 +6,12 @@ Our aim here is to calculate the growth rate (GR) and formation rate (J) of part
 
 This tutorial roughly follows: Kulmala, M. et al. Measurement of the nucleation of atmospheric aerosol particles. Nat. Protocols 7, 1651–1667 (2012).
 
-## Find representative diameters by mode fitting
+## Find representative diameters/times
 
 1) Run the bokeh app `aerosol-analyzer` from the terminal
-2) Load the particle number size distribution data (`data.csv`)
-- The number size distribution should be a csv file with the following format: 
-  - First column: time for example in the format "YYYY-mm-dd HH:MM:SS"
-  - Header: particle diameters in meters
-  - Rest of the columns: particle number size distribution (dN/dlogDp) in cm-3
+2) Load the aerosol number size distribution data (`data.csv`)
 4) Draw a region of interest (ROI) around the growing particle mode
-5) Fit representative diameters using the mode fit method (or maxconc method)
+5) Fit representative diameters/times using the mode fit method, maximum concentration method or the appearance time method.
 6) Save the ROI as a JSON file (`npf_roi.json`)
 
 ![](aerosol_dist.png)
@@ -23,9 +19,16 @@ Figure 1: The number size distribution as a heat map with ROI drawn around the g
 
 ## Calculate GR
 
+Particle growth rate (GR) is defined as the rate of change of particle diameter
+
+$$
+GR =
+\frac{\Delta d_p}{\Delta t}
+$$
+
 Next we write a script that does the following:
 
-1) Load the JSON file 
+1) Load the JSON file with the ROI information 
 2) Extract the representative diameters/times and convert them to nanometers/hours.
 3) Only select the representative diameters in the size range and fit a line through them
 4) GR is calculated as the slope of the line fit in nm/h
@@ -40,7 +43,7 @@ import aerosol.functions as af
 with open('npf_roi.json', 'r') as f:
     data = json.load(f)
 
-# Now `data` is a Python dict or list depending on the file
+# Extract the representative times/diameters from the ROI
 time = []
 diam = []
 for i in range(len(data[0]["fit_mode_params"])):
@@ -53,7 +56,7 @@ for i in range(len(data[0]["fit_mode_params"])):
 time = np.array(time)
 diam = np.array(diam)
 
-# Calculate the GR
+# Calculate the GR (done here between 7-20 nm)
 idx1 = np.argwhere(((diam>7.) & (diam<20.))).flatten()
 gr = np.polyfit(time[idx1],diam[idx1],1)[0] # nm/h
 
@@ -62,7 +65,7 @@ print(f'{gr:.2f} nm h-1')
 # OUTPUT: 5.73 nm h-1
 ```
 
-## Calculate the formation rate
+## Calculate the formation rate (J)
 
 The formation rate can be approximated by
 

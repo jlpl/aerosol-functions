@@ -1,7 +1,7 @@
 from functools import partial
 from bokeh.io import curdoc
 from bokeh.layouts import column, row, Spacer
-from bokeh.models import TapTool, FreehandDrawTool, BoxEditTool, ColumnDataSource, Button, Div, TextInput, FileInput, CustomJS, Span, Scatter, TextAreaInput, Toolbar, Select, BoxEditTool, Patches
+from bokeh.models import TapTool, FreehandDrawTool, BoxEditTool, ColumnDataSource, Button, Div, TextInput, FileInput, CustomJS, Span, Scatter, TextAreaInput, Toolbar, Select, BoxEditTool, Patches, FileInput
 from bokeh.plotting import figure
 from bokeh.events import ButtonClick
 import numpy as np
@@ -16,7 +16,7 @@ from bokeh.palettes import Category10
 import pandas as pd
 import json
 import sys
-from io import StringIO
+from io import StringIO, BytesIO
 import base64
 import aerosol.functions as af
 import aerosol.fitting as afi
@@ -28,6 +28,7 @@ from scipy.signal import find_peaks
 from sklearn.neighbors import KernelDensity
 from scipy.optimize import curve_fit
 from scipy.interpolate import UnivariateSpline
+from tkinter import Tk, filedialog
 
 def find_df_in_polygon(data,poly):
     # Return aerosol number size disribution from inside a rectangle 
@@ -101,7 +102,7 @@ def fit_modes_method(data):
             }
 
             peaks.append(peak)
-        
+       
         time_str = pd.to_datetime(tim[j],unit="ms").strftime("%Y-%m-%d %H:%M:%S")
         info_text_updates += f"Fitted: {time_str} <br>"
 
@@ -163,11 +164,76 @@ def fit_maxconc_method(data):
 
     return peaks
 
+def sigmoid(x, x0, k):
+    return 1.0 / (1 + np.exp(-k*(x-x0)))
+
+def fit_app_method(data):
+    global info_div
+
+    tim = data.index.values.astype(float)
+    dp = np.log10(data.columns.astype(float).values*1e9)
+
+    peaks = []
+
+    info_text_updates = ""
+
+    for j in range(data.shape[1]):
+        conc = data.iloc[:,j].values.flatten()
+
+        # Convert to pandas Series
+        ds = pd.Series(index = tim, data = conc)
+    
+        # Interpolate away the NaN values but do not extrapolate, remove any NaN tails
+        s = ds.interpolate(limit_area="inside").dropna()
+    
+        # Set negative values to zero
+        s[s<0]=0
+
+        # Recover x and y for fitting
+        x_interp = s.index.values
+        y_interp = s.values
+
+        # Ensure there is enough data    
+        if ((len(x_interp)<3) & (len(y_interp)<3)):
+            continue
+
+        # Scale
+        fac = (1000*60*60)
+        x_interp = x_interp/fac
+
+        # Set maximum to 1
+        y_interp = y_interp/np.max(y_interp)
+
+        # Perform fit
+        # Initial parameter guess: L, x0, k
+        p0 = [np.nanmedian(x_interp), 1.] 
+       
+        try:         
+            params,_ = curve_fit(sigmoid, x_interp, y_interp, p0)
+       
+            peak = {
+                "time": params[0]*fac, # milliseconds since epoch
+                "diam": (10**dp[j])*1e-9, # meters
+                #"k": params[2],
+                #"amplitude": params[0]
+            }
+    
+            peaks.append(peak)
+        except:
+            pass
+    
+        dp_str = f"{10**dp[j]:.3f}"
+        info_text_updates += f"Fitted: {dp_str} nm <br>"
+        info_div.text = info_text_updates
+
+    return peaks
+
+
 def update_peaks():
     global list_of_polygons
-    global selected_polygon_index
     global mode_peaks_source
     global maxconc_peaks_source
+    global app_peaks_source
 
     peak_mode_diams = []
     peak_mode_times = []
@@ -175,11 +241,16 @@ def update_peaks():
     peak_maxconc_diams = []
     peak_maxconc_times = []
 
+    peak_app_diams = []
+    peak_app_times = []
+
     for p in list_of_polygons:
         peak_mode_diams = peak_mode_diams + [params["diam"] for params in p["fit_mode_params"]]
         peak_mode_times = peak_mode_times + [params["time"] for params in p["fit_mode_params"]]
         peak_maxconc_diams = peak_maxconc_diams + [params["diam"] for params in p["fit_maxconc_params"]]
         peak_maxconc_times = peak_maxconc_times + [params["time"] for params in p["fit_maxconc_params"]]
+        peak_app_diams = peak_app_diams + [params["diam"] for params in p["fit_app_params"]]
+        peak_app_times = peak_app_times + [params["time"] for params in p["fit_app_params"]]
 
     mode_peaks_source.data = {
         "t": peak_mode_times,
@@ -189,54 +260,62 @@ def update_peaks():
         "t": peak_maxconc_times, 
         "d": peak_maxconc_diams
     }
+    app_peaks_source.data = {
+        "t": peak_app_times, 
+        "d": peak_app_diams
+    }
 
-def update_dist_fits():
-    global df
-    global fig_dist
-    global list_of_polygons
-    global dist_fit_line_renderers
-    global fit_line_colors
 
-    if df is not None:
-
-        # Get the timestamp of the current distribution
-        dist_datetime = pd.to_datetime(fig_dist.title.text)
-
-        # Check if any of the fitted modes match the dist_datetime
-        timestamp_matches = False
-        for p in list_of_polygons:
-            for d in p["fit_mode_params"]:
-                if (pd.to_datetime(d["time"],unit="ms")==dist_datetime):
-                    timestamp_matches = True
-                    break
-            if timestamp_matches:
-                break
-
-        if timestamp_matches:
-            for dist_fit_line_renderer in dist_fit_line_renderers:
-                fig_dist.renderers.remove(dist_fit_line_renderer)
-            dist_fit_line_renderers = []
-        else:
-            return
-
-        y_data = df.columns.values.astype(float)
- 
-        color_index = 0
-
-        # Check if any of the fits are going to go to the current distribution
-        for p in list_of_polygons:
-            for d in p["fit_mode_params"]:
-                if (pd.to_datetime(d["time"], unit="ms") == dist_datetime):
-                    dist_fit = afi.gaussian(np.log10(y_data*1e9), d["amplitude"], d["mean"], d["sigma"])
-                    renderer = fig_dist.line(
-                        'x',
-                        'y',
-                        source=ColumnDataSource(data=dict(x=y_data,y=dist_fit)),
-                        line_width=1,
-                        color=fit_line_colors[color_index % len(fit_line_colors)]
-                    )
-                    dist_fit_line_renderers.append(renderer)
-                    color_index += 1
+#def update_dist_fits():
+#    global df
+#    global fig_dist
+#    global list_of_polygons
+#    global dist_fit_line_renderers
+#    global fit_line_colors
+#
+#    if df is not None:
+#
+#        # Get the timestamp of the current distribution
+#        try:
+#            dist_datetime = pd.to_datetime(fig_dist.title.text)
+#        except:
+#            return
+#
+#        # Check if any of the fitted modes match the dist_datetime
+#        timestamp_matches = False
+#        for p in list_of_polygons:
+#            for d in p["fit_mode_params"]:
+#                if (pd.to_datetime(d["time"],unit="ms")==dist_datetime):
+#                    timestamp_matches = True
+#                    break
+#            if timestamp_matches:
+#                break
+#
+#        if timestamp_matches:
+#            for dist_fit_line_renderer in dist_fit_line_renderers:
+#                fig_dist.renderers.remove(dist_fit_line_renderer)
+#            dist_fit_line_renderers = []
+#        else:
+#            return
+#
+#        y_data = df.columns.values.astype(float)
+# 
+#        color_index = 0
+#
+#        # Check if any of the fits are going to go to the current distribution
+#        for p in list_of_polygons:
+#            for d in p["fit_mode_params"]:
+#                if (pd.to_datetime(d["time"], unit="ms") == dist_datetime):
+#                    dist_fit = afi.gaussian(np.log10(y_data*1e9), d["amplitude"], d["mean"], d["sigma"])
+#                    renderer = fig_dist.line(
+#                        'x',
+#                        'y',
+#                        source=ColumnDataSource(data=dict(x=y_data,y=dist_fit)),
+#                        line_width=1,
+#                        color=fit_line_colors[color_index % len(fit_line_colors)]
+#                    )
+#                    dist_fit_line_renderers.append(renderer)
+#                    color_index += 1
 
 
 def do_fit_modes(event):
@@ -257,7 +336,7 @@ def do_fit_modes(event):
 
         update_peaks()
 
-        update_dist_fits()
+       # update_dist_fits()
 
 
 def do_fit_maxconc(event):
@@ -275,6 +354,24 @@ def do_fit_maxconc(event):
         peaks = fit_maxconc_method(df_subset)
 
         list_of_polygons[selected_polygon_index]["fit_maxconc_params"] = peaks
+
+        update_peaks()
+
+def do_fit_app(event):
+    # Run this when the fit appearance time button is pressed
+    global list_of_polygons
+    global selected_polygon_index
+    global df
+
+    if selected_polygon_index is not None:
+
+        polygon = list_of_polygons[selected_polygon_index]
+        
+        df_subset = find_df_in_polygon(df.copy(),polygon)
+        
+        peaks = fit_app_method(df_subset)
+
+        list_of_polygons[selected_polygon_index]["fit_app_params"] = peaks
 
         update_peaks()
 
@@ -324,6 +421,18 @@ def remove_maxconc_fits_from_polygon(event):
         # Remove the points from the plot
         update_peaks()
 
+def remove_app_fits_from_polygon(event):
+    # a remove mode fits button is pressed
+    global list_of_polygons
+    global selected_polygon_index
+
+    if selected_polygon_index is not None:
+
+        # Empty the list containing the fitted parametrs
+        list_of_polygons[selected_polygon_index]["fit_app_params"] = []
+
+        # Remove the points from the plot
+        update_peaks()
 
 def update_polygon_renderer():
     global list_of_polygons
@@ -337,6 +446,8 @@ def update_polygon_renderer():
                        "fill_alpha": [0.2 for polygon in list_of_polygons],
                        "line_color": ["black" for polygon in list_of_polygons],
                        "line_alpha": [1 for polygon in list_of_polygons]} 
+        info_div.text = ""
+
     else:
         fill_colors = []
         line_colors = []
@@ -364,42 +475,15 @@ def update_polygon_renderer():
                        "fill_color": fill_colors,
                        "fill_alpha": fill_alphas,
                        "line_color": line_colors,
-                       "line_alpha": line_alphas} 
-     
-    polygon_background_source.data = loaded_data
+                       "line_alpha": line_alphas}
 
-
-
-def update_selected_polygon(attr, old, new):
-    # When you click on a polygon using the Tap tool
-    global list_of_polygons
-    global selected_polygon_index
-    global label_submit_button
-    global fig
-    global polygon_background_source
-    global info_div
-
-    # A polygon has been selected using the Tap tool
-    if (len(new)==1):
-        selection_id = new[0]
-        selected_x = polygon_background_source.data["xs"][selection_id]
-        selected_y = polygon_background_source.data["ys"][selection_id]
-
-        # Find the polygon based on the x coordinates
-        for i in range(len(list_of_polygons)):
-            if (list_of_polygons[i]['x'] == selected_x):
-                selected_polygon_index=i
-
-                info_div.text = f""" \
+        info_div.text = f""" \
                 Selected ROI: <br> \
                 Index: {selected_polygon_index} <br> \
                 Label: {list_of_polygons[selected_polygon_index]["label"]} \
                 """
-    else:
-        selected_polygon_index = None
-        info_div.text = f""
-    update_polygon_renderer()
 
+    polygon_background_source.data = loaded_data
 
 
 # This is called when polygon is added
@@ -421,9 +505,13 @@ def update_list_of_polygons(attr, old, new):
         polygon["y"] = new_y[0]
         polygon["fit_mode_params"] = []
         polygon["fit_maxconc_params"] = []
+        polygon["fit_app_params"] = []
         polygon["label"] = ""
+
+        selected_polygon_index = len(list_of_polygons)
     
         list_of_polygons.append(polygon)
+
         update_polygon_renderer()
 
         polygon_source.data = dict(xs=[], ys=[])
@@ -435,6 +523,7 @@ def update_list_of_polygons(attr, old, new):
 def rect_to_update_list_of_polygons(attr, old, new):
     global list_of_polygons
     global rect_source
+    global selected_polygon_index
 
     # Check if there is any data to convert
     xs = rect_source.data.get('x', [])
@@ -461,7 +550,9 @@ def rect_to_update_list_of_polygons(attr, old, new):
     polygon["y"] = new_ys[0]
     polygon["fit_mode_params"] = []
     polygon["fit_maxconc_params"] = []
+    polygon["fit_app_params"] = []
     polygon["label"] = ""
+    selected_polygon_index = len(list_of_polygons)
     
     list_of_polygons.append(polygon)
     update_polygon_renderer()
@@ -480,12 +571,14 @@ def load_aerosol_file(event):
     global info_div
     global df
     global mode_peaks_source
-    #global maxconc_peaks_source
+    global maxconc_peaks_source
+    global app_peaks_source
 
-    f = aerosol_file_text_input.value 
+    root = Tk(); root.withdraw()  # hide the empty Tk window
+    file_path = filedialog.askopenfilename()
 
     try:
-        df = pd.read_csv(f, index_col=0, parse_dates=True) 
+        df = pd.read_csv(file_path, index_col=0, parse_dates=True) 
         
         diams = df.columns.astype(float).values
         df.columns = diams
@@ -533,11 +626,12 @@ def load_aerosol_file(event):
      
         # Add the maxconc points
         mode_peaks_source.data = {"t":[], "d":[]}
-        # maxconc_peaks_source.data = {"t":[], "d":[]}
-     
-        info_div.text = f"Loaded aerosol data from: {f}"
+        maxconc_peaks_source.data = {"t":[], "d":[]}
+        app_peaks_source.data = {"t":[], "d":[]}
+
+        info_div.text = f"Loaded aerosol data successfully!"
     except:
-        info_div.text = f"Unable to load aerosol data from: {f}"
+        info_div.text = f"Unable to load aerosol data."
 
 def update_clim(event):
     global mapper
@@ -567,38 +661,56 @@ def update_labels():
 def load_polygon_data(event):
     global list_of_polygons
     global polygon_source
-    global json_load_text_input
     global info_div
     global selected_polygon_index
 
-    # Load the json file
-    with open(json_load_text_input.value, 'r') as f:
-        try: 
-            list_of_polygons = json.load(f)
+    root = Tk(); root.withdraw()
+    file_path = filedialog.askopenfilename()
 
-            selected_polygon_index = None
+    if file_path:
+        with open(file_path) as f:
+            try: 
+                list_of_polygons = json.load(f)
+        
+                mode_peaks_source.data = {"t":[],"d":[]} 
+                maxconc_peaks_source.data = {"t":[],"d":[]} 
+                app_peaks_source.data = {"t":[],"d":[]} 
+        
+                selected_polygon_index = None
+        
+                update_polygon_renderer()
+        
+                update_peaks()
+        
+                update_labels()
+        
+                info_div.text=f"ROIs successfully loaded"
+            except: 
+                info_div.text=f"Unable to load ROIs"
 
-            update_polygon_renderer()
-
-            update_peaks()
-
-            update_labels()
-
-            info_div.text=f"ROIs loaded from: {json_load_text_input.value}"
-        except: 
-            info_div.text=f"Unable to load ROIs from: {json_load_text_input.value}"
 
 def save_polygon_data(event):
     global list_of_polygons
     global json_save_text_input
     global info_div
-    
-    with open(json_save_text_input.value, "w") as f:
-        try:
+   
+    # Hide the root Tk window
+    root = Tk()
+    root.withdraw()
+
+    # Ask the user where to save the file
+    file_path = filedialog.asksaveasfilename(
+        defaultextension=".json",
+        filetypes=[("JSON files", "*.json"), ("All files", "*.*")]
+    )
+
+    if file_path:
+        with open(file_path, "w") as f:
             json.dump(list_of_polygons, f, indent=4)
-            info_div.text=f"ROIs saved to: {json_save_text_input.value}"
-        except:
-            info_div.text=f"Unable to save ROIs to: {json_save_text_input.value}"
+        info_div.text = f"Saved ROIs to: {file_path}"
+    else:
+        info_div.text = "Saving ROIs failed"
+
 
 def tap_callback(event):
     global fig_dist
@@ -608,8 +720,10 @@ def tap_callback(event):
     global dist
     global is_check_dist
     global list_of_polygons
+    global selected_polygon_index
     global dist_fit_line_renderers
     global fit_line_colors
+    global info_div
 
     if df is not None:
 
@@ -646,6 +760,24 @@ def tap_callback(event):
         dist_fit_line_renderers = []
 
         color_index = 0
+
+        # Figure out if any polygon was clicked
+        for i in range(len(list_of_polygons)):
+            p = list_of_polygons[i]
+    
+            x_coords = p['x'] # milliseconds since epoch
+            y_coords = p['y'] # diameter
+        
+            loop = Path(np.column_stack((x_coords,y_coords)).astype(float))
+
+            if loop.contains_points([[event.x, event.y]])[0]:
+                selected_polygon_index = i
+                break
+
+            else:
+                selected_polygon_index = None
+
+        update_polygon_renderer()
 
         # Plot any fits if they exist
         for p in list_of_polygons:
@@ -686,11 +818,12 @@ def remove_selected_polygon(attr,old,new):
 
     if selected_polygon_index is not None:
         del list_of_polygons[selected_polygon_index]
+        selected_polygon_index = None
         update_polygon_renderer()
         update_peaks()
-        selected_polygon_index = None
+        #selected_polygon_index = None
         info_div.text = ""
-        update_polygon_renderer()
+        #update_polygon_renderer()
 
 
 def add_option(event):
@@ -701,14 +834,13 @@ def add_option(event):
         dropdown.options.append(add_option_text_input.value)
         add_option_text_input.value = ""
 
+# Remove the selected dropdown value from the list
 def remove_option(event):
-    global add_option_text_input
+    #global add_option_text_input
     global dropdown
 
-    if ((add_option_text_input.value in dropdown.options) & (add_option_text_input.value!="")): 
-        dropdown.options.remove(add_option_text_input.value)
-        add_option_text_input.value = ""
-
+    if (dropdown.value in dropdown.options):
+        dropdown.options.remove(dropdown.value)
 
 def on_cmap_select(attr, old, new):
     global mapper
@@ -720,10 +852,8 @@ def on_cmap_select(attr, old, new):
     elif new == "Cividis":
         mapper.palette = Cividis256
 
-
 def close_app():
     sys.exit()
-
 
 # CLOSE THE APP
 close_js = CustomJS(code="window.close()")
@@ -759,7 +889,7 @@ rect_source = ColumnDataSource(data=dict(x=[], y=[], width=[], height=[]))
 
 mode_peaks_source = ColumnDataSource(data = dict(t=[], d=[]))
 maxconc_peaks_source = ColumnDataSource(data = dict(t=[], d=[]))
-
+app_peaks_source = ColumnDataSource(data = dict(t=[], d=[]))
 
 # Create the surface plot figures
 fig = figure(
@@ -835,8 +965,13 @@ mode_peaks_glyph = Scatter(x="t", y="d", size=5, marker="circle", fill_color="wh
 fig.add_glyph(mode_peaks_source, mode_peaks_glyph)
 
 # Fitted maxconc peaks
-maxconc_peaks_glyph = Scatter(x="t", y="d", size=5, marker="circle", fill_color="white", line_color="black")
+maxconc_peaks_glyph = Scatter(x="t", y="d", size=5, marker="circle", fill_color="yellow", line_color="black")
 fig.add_glyph(maxconc_peaks_source, maxconc_peaks_glyph)
+
+# Fitted app peaks
+app_peaks_glyph = Scatter(x="t", y="d", size=5, marker="circle", fill_color="cyan", line_color="black")
+fig.add_glyph(app_peaks_source, app_peaks_glyph)
+
 
 # Draw tool for drawing the polygons
 draw_tool = FreehandDrawTool(renderers=[poly_renderer])
@@ -845,10 +980,6 @@ fig.add_tools(draw_tool)
 # Add BoxSelectTool
 box_tool = BoxEditTool(renderers=[rect_renderer])
 fig.add_tools(box_tool)
-
-## Add Tap tool
-tap_tool = TapTool(renderers=[poly_background_renderer])
-fig.add_tools(tap_tool)
 
 # Add colorbar
 color_bar = ColorBar(
@@ -859,11 +990,9 @@ color_bar = ColorBar(
 
 fig.add_layout(color_bar, 'right')
 
-# When polygon is selected with TapTool
-poly_background_renderer.data_source.selected.on_change('indices', update_selected_polygon)
-
-# Actions for tapping figure
+# Actions for tapping figure, this does not require a taptool be chosen...
 fig.on_event('tap',tap_callback)
+
 
 # When we draw we want to launch the function to update polygons
 polygon_source.on_change('data', update_list_of_polygons)
@@ -871,33 +1000,42 @@ polygon_source.on_change('data', update_list_of_polygons)
 # Same if we draw a rectangle
 rect_source.on_change("data", rect_to_update_list_of_polygons)
 
+
 # Fit mode controls
 fit_modes_text_input = TextInput(placeholder = "Number of Modes", value="1", width=150, height=30)
 
-fit_modes_button = Button(label="Fit modes", button_type="primary", width=150, height=30)
+fit_modes_button = Button(label="Fit log-normal modes", button_type="primary", width=150, height=30)
 
-remove_modes_button = Button(label="Clear mode fit", button_type="primary", width=150, height=30)
+remove_modes_button = Button(label="Clear fit", button_type="primary", width=150, height=30)
 
 fit_modes_button.on_event(ButtonClick, do_fit_modes)
 
 remove_modes_button.on_event(ButtonClick, remove_mode_fits_from_polygon)
 
 # Fit maxconc controls
-fit_maxconc_button = Button(label="Fit maxconc", button_type="primary", width=150, height=30)
+fit_maxconc_button = Button(label="Fit max. conc.", button_type="primary", width=150, height=30)
 
-remove_maxconc_button = Button(label="Clear maxconc fit", button_type="primary", width=150, height=30)
+remove_maxconc_button = Button(label="Clear fit", button_type="primary", width=150, height=30)
 
 fit_maxconc_button.on_event(ButtonClick, do_fit_maxconc)
 
 remove_maxconc_button.on_event(ButtonClick, remove_maxconc_fits_from_polygon)
+
+
+# Fit app controls
+fit_app_button = Button(label="Fit app. time", button_type="primary", width=150, height=30)
+
+remove_app_button = Button(label="Clear fit", button_type="primary", width=150, height=30)
+
+fit_app_button.on_event(ButtonClick, do_fit_app)
+
+remove_app_button.on_event(ButtonClick, remove_app_fits_from_polygon)
 
 button_spacer = Spacer(width=160,height=30)
 
 # Load the aerosol data
 aerosol_file_button = Button(label="Load aerosol data", button_type="primary",height=30,width=150)
 
-aerosol_file_text_input = TextInput(placeholder="Aerosol distribution filepath",height=30,width=310)
-       
 aerosol_file_button.on_event(ButtonClick, load_aerosol_file)
 
 # Update color limits
@@ -912,26 +1050,18 @@ clim_update_button.on_event(ButtonClick, update_clim)
 # Load ROIs
 json_load_button = Button(label="Load ROIs", button_type="primary",height=30,width=150)
 
-json_load_text_input = TextInput(placeholder="ROI filepath",height=30,width=310)
-
 json_load_button.on_event(ButtonClick, load_polygon_data)
 
-# Load ROIs
-#roi_file_input = FileInput(title='Load ROIs')
-
-#roi_file_input.on_change('value', load_polygon_data)
 
 # Save ROIs
 json_save_button = Button(label="Save ROIs", button_type="primary",height=30,width=150)
 
-json_save_text_input = TextInput(placeholder="ROI filepath",height=30,width=310)
-
 json_save_button.on_event(ButtonClick, save_polygon_data)
 
-# colormap dropdown
-cmap_dropdown = Select(value = "Turbo", options = ["Turbo","Inferno","Cividis"], width=230, height=30)
 
-# Implement onSelect()
+# colormap dropdown menu
+cmap_dropdown = Select(value = "Turbo", options = ["Turbo","Inferno","Cividis"], width=150, height=30)
+
 cmap_dropdown.on_change('value', on_cmap_select)
 
 # Label select
@@ -951,12 +1081,7 @@ remove_option_button = Button(label="Remove Label", button_type="primary", heigh
 
 remove_option_button.on_event(ButtonClick, remove_option)
 
-## Delete ROI button
-#remove_selected_polygon_button = Button(label="Remove selected ROI", button_type="warning", height=30, width=150)
-#
-#remove_selected_polygon_button.on_event(ButtonClick, remove_selected_polygon)
-
-# close the app button
+# Close the app button
 close_app_button = Button(label="Close App", button_type="danger")
 close_app_button.js_on_click(close_js)
 close_app_button.on_click(close_app)
@@ -975,18 +1100,18 @@ title_div = Div(text="Aerosol Size Distribution GUI Tool", width=500, height=50,
         "align-items": "flex-start"
 })
 
-hotkey_div = Div(text='Press "x" to delete selected  ROI', width=470, height=60, styles = {
+hotkey_div = Div(text='If ROI is selected:<br>"x" deletes selected ROI', width=470, height=60, styles = {
         "display": "flex",
         "align-items": "flex-start"
 })
 
-# Delete ROI by pressing "x"
+### Delete ROI by pressing "x"
 key_source = ColumnDataSource(data=dict(key=[]))
 
 # Watch for changes in key_source
 key_source.on_change('data', remove_selected_polygon)
 
-# JS to listen for key presses and update key_source
+## JS to listen for key presses and update key_source
 key_listener = CustomJS(args=dict(source=key_source), code="""
     document.addEventListener('keydown', function(event) {
         if (event.key === 'x') {
@@ -1002,11 +1127,8 @@ fig.js_on_event('tap', key_listener)
 layout = column(
     row(title_div),
     column(
-        row(clim_min_text_input,clim_max_text_input,clim_update_button),
-        row(cmap_dropdown),
-        row(aerosol_file_text_input,aerosol_file_button),
-        row(json_load_text_input,json_load_button),
-        row(json_save_text_input,json_save_button),
+        row(clim_min_text_input,clim_max_text_input,clim_update_button,cmap_dropdown),
+        row(aerosol_file_button,json_load_button,json_save_button),
         width=500),
     fig,
     row(
@@ -1014,6 +1136,7 @@ layout = column(
             row(hotkey_div),
             row(fit_modes_text_input,fit_modes_button,remove_modes_button),
             row(button_spacer,fit_maxconc_button,remove_maxconc_button),
+            row(button_spacer,fit_app_button,remove_app_button),
             row(dropdown, add_option_text_input), 
             row(label_submit_button,add_option_button, remove_option_button),
             row(info_div),

@@ -42,24 +42,13 @@
 <p>Our aim here is to calculate the growth rate (GR) and formation rate (J) of particles in the size range 7-20 nm from aerosol number size distribution data.</p>
 <p>This tutorial roughly follows: Kulmala, M. et al. Measurement of the nucleation of atmospheric aerosol particles. Nat. Protocols 7, 1651–1667 (2012).</p>
 </section>
-<section id="find-representative-diameters-by-mode-fitting">
-<h2>Find representative diameters by mode fitting<a class="headerlink" href="#find-representative-diameters-by-mode-fitting" title="Link to this heading">¶</a></h2>
+<section id="find-representative-diameters-times">
+<h2>Find representative diameters/times<a class="headerlink" href="#find-representative-diameters-times" title="Link to this heading">¶</a></h2>
 <ol class="arabic simple">
 <li><p>Run the bokeh app <code class="docutils literal notranslate"><span class="pre">aerosol-analyzer</span></code> from the terminal</p></li>
-<li><p>Load the particle number size distribution data (<code class="docutils literal notranslate"><span class="pre">data.csv</span></code>)</p></li>
-</ol>
-<ul class="simple">
-<li><p>The number size distribution should be a csv file with the following format:</p>
-<ul>
-<li><p>First column: time for example in the format “YYYY-mm-dd HH:MM:SS”</p></li>
-<li><p>Header: particle diameters in meters</p></li>
-<li><p>Rest of the columns: particle number size distribution (dN/dlogDp) in cm-3</p></li>
-</ul>
-</li>
-</ul>
-<ol class="arabic simple" start="4">
+<li><p>Load the aerosol number size distribution data (<code class="docutils literal notranslate"><span class="pre">data.csv</span></code>)</p></li>
 <li><p>Draw a region of interest (ROI) around the growing particle mode</p></li>
-<li><p>Fit representative diameters using the mode fit method (or maxconc method)</p></li>
+<li><p>Fit representative diameters/times using the mode fit method, maximum concentration method or the appearance time method.</p></li>
 <li><p>Save the ROI as a JSON file (<code class="docutils literal notranslate"><span class="pre">npf_roi.json</span></code>)</p></li>
 </ol>
 <p><img alt="" src="_images/aerosol_dist.png" />
@@ -67,9 +56,15 @@ Figure 1: The number size distribution as a heat map with ROI drawn around the g
 </section>
 <section id="calculate-gr">
 <h2>Calculate GR<a class="headerlink" href="#calculate-gr" title="Link to this heading">¶</a></h2>
+<p>Particle growth rate (GR) is defined as the rate of change of particle diameter</p>
+<div class="math notranslate nohighlight">
+\[
+GR =
+\frac{\Delta d_p}{\Delta t}
+\]</div>
 <p>Next we write a script that does the following:</p>
 <ol class="arabic simple">
-<li><p>Load the JSON file</p></li>
+<li><p>Load the JSON file with the ROI information</p></li>
 <li><p>Extract the representative diameters/times and convert them to nanometers/hours.</p></li>
 <li><p>Only select the representative diameters in the size range and fit a line through them</p></li>
 <li><p>GR is calculated as the slope of the line fit in nm/h</p></li>
@@ -83,7 +78,7 @@ Figure 1: The number size distribution as a heat map with ROI drawn around the g
 <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="s1">&#39;npf_roi.json&#39;</span><span class="p">,</span> <span class="s1">&#39;r&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
     <span class="n">data</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="n">f</span><span class="p">)</span>
 
-<span class="c1"># Now `data` is a Python dict or list depending on the file</span>
+<span class="c1"># Extract the representative times/diameters from the ROI</span>
 <span class="n">time</span> <span class="o">=</span> <span class="p">[]</span>
 <span class="n">diam</span> <span class="o">=</span> <span class="p">[]</span>
 <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">data</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="s2">&quot;fit_mode_params&quot;</span><span class="p">])):</span>
@@ -96,7 +91,7 @@ Figure 1: The number size distribution as a heat map with ROI drawn around the g
 <span class="n">time</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">time</span><span class="p">)</span>
 <span class="n">diam</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">diam</span><span class="p">)</span>
 
-<span class="c1"># Calculate the GR</span>
+<span class="c1"># Calculate the GR (done here between 7-20 nm)</span>
 <span class="n">idx1</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">argwhere</span><span class="p">(((</span><span class="n">diam</span><span class="o">&gt;</span><span class="mf">7.</span><span class="p">)</span> <span class="o">&amp;</span> <span class="p">(</span><span class="n">diam</span><span class="o">&lt;</span><span class="mf">20.</span><span class="p">)))</span><span class="o">.</span><span class="n">flatten</span><span class="p">()</span>
 <span class="n">gr</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">polyfit</span><span class="p">(</span><span class="n">time</span><span class="p">[</span><span class="n">idx1</span><span class="p">],</span><span class="n">diam</span><span class="p">[</span><span class="n">idx1</span><span class="p">],</span><span class="mi">1</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span> <span class="c1"># nm/h</span>
 
@@ -106,8 +101,8 @@ Figure 1: The number size distribution as a heat map with ROI drawn around the g
 </pre></div>
 </div>
 </section>
-<section id="calculate-the-formation-rate">
-<h2>Calculate the formation rate<a class="headerlink" href="#calculate-the-formation-rate" title="Link to this heading">¶</a></h2>
+<section id="calculate-the-formation-rate-j">
+<h2>Calculate the formation rate (J)<a class="headerlink" href="#calculate-the-formation-rate-j" title="Link to this heading">¶</a></h2>
 <p>The formation rate can be approximated by</p>
 <div class="math notranslate nohighlight">
 \[
@@ -189,9 +184,9 @@ the sink term and the growth term.</p>
 <center>v. 0.1.13</center>
 </div><h3><a href="index.html"></a></h3>
 <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="aerosol_number_size_distribution.html">Aerosol Number-Size distribution</a></li>
 <li class="toctree-l1"><a class="reference internal" href="aerosol.html">aerosol package</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="aerosol.html#module-aerosol.functions">aerosol.functions module</a><ul>
-<li class="toctree-l3"><a class="reference internal" href="aerosol.html#aerosol-number-size-distribution">Aerosol number-size distribution</a></li>
 <li class="toctree-l3"><a class="reference internal" href="aerosol.html#aerosol.functions.air_density"><code class="docutils literal notranslate"><span class="pre">air_density()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="aerosol.html#aerosol.functions.air_viscosity"><code class="docutils literal notranslate"><span class="pre">air_viscosity()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="aerosol.html#aerosol.functions.beta"><code class="docutils literal notranslate"><span class="pre">beta()</span></code></a></li>
@@ -224,6 +219,7 @@ the sink term and the growth term.</p>
 <li class="toctree-l3"><a class="reference internal" href="aerosol.html#aerosol.functions.mean_free_path"><code class="docutils literal notranslate"><span class="pre">mean_free_path()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="aerosol.html#aerosol.functions.mob2diam"><code class="docutils literal notranslate"><span class="pre">mob2diam()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="aerosol.html#aerosol.functions.nanoranking"><code class="docutils literal notranslate"><span class="pre">nanoranking()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="aerosol.html#aerosol.functions.nanoranking_conc"><code class="docutils literal notranslate"><span class="pre">nanoranking_conc()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="aerosol.html#aerosol.functions.particle_diffusivity"><code class="docutils literal notranslate"><span class="pre">particle_diffusivity()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="aerosol.html#aerosol.functions.particle_mean_free_path"><code class="docutils literal notranslate"><span class="pre">particle_mean_free_path()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="aerosol.html#aerosol.functions.particle_thermal_speed"><code class="docutils literal notranslate"><span class="pre">particle_thermal_speed()</span></code></a></li>
@@ -259,9 +255,9 @@ the sink term and the growth term.</p>
 </li>
 <li class="toctree-l1 current"><a class="current reference internal" href="#">NPF Analysis Tutorial</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="#introduction">Introduction</a></li>
-<li class="toctree-l2"><a class="reference internal" href="#find-representative-diameters-by-mode-fitting">Find representative diameters by mode fitting</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#find-representative-diameters-times">Find representative diameters/times</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#calculate-gr">Calculate GR</a></li>
-<li class="toctree-l2"><a class="reference internal" href="#calculate-the-formation-rate">Calculate the formation rate</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#calculate-the-formation-rate-j">Calculate the formation rate (J)</a><ul>
 <li class="toctree-l3"><a class="reference internal" href="#calculating-the-sink-term">Calculating the sink term</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#converting-gr-to-dataframe">Converting GR to dataframe</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#calculating-the-formation-rate">Calculating the formation rate</a></li>

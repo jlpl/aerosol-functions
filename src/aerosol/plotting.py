@@ -37,11 +37,13 @@ def plot_one_to_one_line(ax=None, color='black', linestyle='--', linewidth=1):
     line_max = min(xmax, ymax)
     
     # Plot the one-to-one line
-    ax.plot([line_min, line_max], [line_min, line_max], color=color, linestyle=linestyle, linewidth=linewidth)
+    p = ax.plot([line_min, line_max], [line_min, line_max], color=color, linestyle=linestyle, linewidth=linewidth)[0]
 
     # Reset limits to ensure they don't change after plotting the line
     ax.set_xlim(xmin, xmax)
     ax.set_ylim(ymin, ymax)
+
+    return p
 
 
 def set_legend_outside(ax,handles=None,labels=None,coords=(1,1),**kwargs):

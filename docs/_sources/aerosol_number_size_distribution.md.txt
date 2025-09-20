@@ -1,0 +1,17 @@
+# Aerosol Number-Size distribution
+
+In the functions of this package an aerosol number-size distribution is assumed to be a `pandas DataFrame` where
+
+**Index : pandas DatetimeIndex**
+
+- Timestamps
+
+**Columns : float**
+
+- Size bin geometric mean diameters
+- Unit: m
+    
+**Values : float**
+    
+- Normalized concentrations, dN/dlogDp
+- Unit: cm-3

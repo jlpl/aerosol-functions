@@ -157,7 +157,29 @@ def find_final_gaussians(gaussians_gmm, gaussians_lsq, n_modes, x_data, method):
 
     return gaussians
 
-def fit_multimode(x, y, timestamp, n_modes = None, n_samples = 10000, method="cluster"):
+def calc_avg_gmm_fit(list_of_gaussians, n_components): 
+    gaussians = []
+    for i in range(n_components):
+        avg_mean_i = []
+        avg_sigma_i = []
+        avg_amplitude_i = []
+        for g in list_of_gaussians:
+            avg_mean_i.append(g[i]["mean"])
+            avg_sigma_i.append(g[i]["sigma"])
+            avg_amplitude_i.append(g[i]["amplitude"])
+
+        g_i = {
+            "mean":np.median(avg_mean_i),
+            "sigma":np.median(avg_sigma_i),
+            "amplitude":np.median(avg_amplitude_i)
+        }
+
+        gaussians.append(g_i)
+
+    return gaussians
+
+
+def fit_multimode(x, y, timestamp, n_modes = None, n_samples = 10000, method="lsqr", n_ensemble = 10):
     """
     Fit multimodal Gaussian to aerosol number-size distribution
 
@@ -178,6 +200,8 @@ def fit_multimode(x, y, timestamp, n_modes = None, n_samples = 10000, method="cl
     method : str
         `cluster` clustering (gaussian mixture)
         `lsqr` least-squares
+    n_ensemble : int
+        number of points in the GMM ensemble
     
     Returns
     -------
@@ -186,24 +210,26 @@ def fit_multimode(x, y, timestamp, n_modes = None, n_samples = 10000, method="cl
         Fit results
 
     """
+    all_ok = True
 
     # Convert to pandas Series
     ds = pd.Series(index = x, data = y)
 
     # Interpolate away the NaN values but do not extrapolate, remove any NaN tails
     s = ds.interpolate(limit_area="inside").dropna()
-
+    
     # Set negative values to zero
     s[s<0]=0
-
+    
     # Recover x and y for fitting
     x_interp = s.index.values
     y_interp = s.values
-
-    all_ok = True
-
+    
+    if np.sum(y_interp)==0:
+        all_ok = False
+    
     sensitivity = 3
-
+    
     aic_scores = []
 
     if len(x_interp)<5:
@@ -213,6 +239,8 @@ def fit_multimode(x, y, timestamp, n_modes = None, n_samples = 10000, method="cl
         samples = af.sample_from_dist(x_interp,y_interp,n_samples)
 
     if ((n_modes is None) and all_ok):
+
+        # Smooth for more stable AIC scores
 
         windo = int(0.41/np.mean(np.diff(x_interp)))
 
@@ -235,8 +263,14 @@ def fit_multimode(x, y, timestamp, n_modes = None, n_samples = 10000, method="cl
             n_modes = aic_kneedle.elbow
 
             # Do the fit using GMM and least squares
-            gaussians_gmm = fit_gmm(samples, n_modes, coef)
-        
+            #gaussians_gmm = fit_gmm(samples, n_modes, coef)
+
+            ensemble_range = np.arange(n_ensemble)
+
+            gaussian_gmms = Parallel(n_jobs=-1)(delayed(fit_gmm)(samples, n_modes, coef) for n in ensemble_range)
+
+            gaussians_gmm = calc_avg_gmm_fit(gaussian_gmms, n_modes)
+       
             gaussians_lsq = fit_multimodal_gaussian(x_interp, y_interp, gaussians_gmm)
 
             if gaussians_lsq is None:
@@ -246,7 +280,11 @@ def fit_multimode(x, y, timestamp, n_modes = None, n_samples = 10000, method="cl
                 gaussians = find_final_gaussians(gaussians_gmm, gaussians_lsq, n_modes, x_interp, method)
 
     elif ((n_modes is not None) and all_ok):
-        gaussians_gmm = fit_gmm(samples, n_modes, coef)
+        ensemble_range = np.arange(n_ensemble)
+        gaussian_gmms = Parallel(n_jobs=-1)(delayed(fit_gmm)(samples, n_modes, coef) for n in ensemble_range)
+        gaussians_gmm = calc_avg_gmm_fit(gaussian_gmms, n_modes)
+
+        #gaussians_gmm = fit_gmm(samples, n_modes, coef)
         gaussians_lsq = fit_multimodal_gaussian(x_interp, y_interp, gaussians_gmm)
         if gaussians_lsq is None:
             print("LSQ failed")
@@ -309,7 +347,7 @@ def fit_multimode(x, y, timestamp, n_modes = None, n_samples = 10000, method="cl
         "predicted_gauss": predicted_gaussians,
         "total_conc": total_conc,
         "mode_concs": mode_concs,
-        "aic_scores":aic_scores,
+        "aic_scores": aic_scores,
     }
 
     return result

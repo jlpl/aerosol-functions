@@ -1,17 +1,3 @@
-"""
-Aerosol number-size distribution
---------------------------------
-
-In the below functions of this package aerosol number-size distribution is assumed to be a `pandas DataFrame` where
-
-index : pandas DatetimeIndex
-    timestamps
-columns : float 
-    size bin geomean diameters, m
-values : float 
-    normalized concentration, dN/dlogDp, cm-3
-
-"""
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -24,7 +10,8 @@ from scipy.interpolate import interp1d
 from scipy.integrate import trapezoid
 from astral import Observer
 from astral.sun import noon
-from scipy.signal import correlate
+from scipy.signal import correlate, correlation_lags, fftconvolve
+
 
 # All constants are SI base units
 E=1.602E-19           # elementary charge
@@ -905,14 +892,14 @@ def calc_conc(df,dmin,dmax,frac=0.5):
 
 def filter_nans(df, threshold=0.0, axis=1):
     if (axis==0):
-        return df.iloc[:,(df.isnull().mean(axis=axis)<=threshold).values]
+        df_filt = df.iloc[:,(df.isnull().mean(axis=axis)<=threshold).values]
     if (axis==1):
-        return df.iloc[(df.isnull().mean(axis=axis)<=threshold).values,:]
+        df_filt = df.iloc[(df.isnull().mean(axis=axis)<=threshold).values,:]
 
-
-    #frac = (df.shape[axis] - df.isna().sum(axis=axis)) / df.shape[axis]
-    #df_filtered = df[frac >= threshold]
-    #return df_filtered
+    if isinstance(df_filt, pd.Series):
+        return df_filt.to_frame()
+    else:
+        return df_filt
 
 def calc_conc_interp(df,dmin,dmax,threshold=0.0):
     """
@@ -925,18 +912,18 @@ def calc_conc_interp(df,dmin,dmax,threshold=0.0):
 
     df : dataframe
         Aerosol number-size distribution
-    dmin : float or series of length n
-        Size range lower diameter(s), unit: m
-    dmax : float or series of length n
-        Size range upper diameter(s), unit: m
+    dmin : float
+        Size range lower diameter, unit: m
+    dmax : float
+        Size range upper diameter, unit: m
     threshold : float
         fraction of nans accepted per row
 
     Returns
     -------
 
-    dataframe
-        Number concentration in the given size range(s), unit: cm-3
+    series
+        Number concentration in the given size range, unit: cm-3
         in the index of the original dataframe 
 
     Note
@@ -947,14 +934,22 @@ def calc_conc_interp(df,dmin,dmax,threshold=0.0):
 
     """
 
-    dmin = pd.Series(dmin)
-    dmax = pd.Series(dmax)
+    #dmin = pd.Series(dmin)
+    #dmax = pd.Series(dmax)
+
+    # Find the columns with dmin and dmax
+    dp = df.columns.astype(float).values
+
+    findex_min = int(np.max([0,np.min(np.argwhere(dp>dmin))-1]))
+    findex_max = int(np.min([len(dp)-1,np.max(np.argwhere(dp<dmax))+1]))
+
+    df = df.iloc[:,findex_min:findex_max+1]
 
     # Only keep rows with more than threshold fraction of nan-values
     df_filt = filter_nans(df,threshold=threshold,axis=1)
 
     if df_filt.empty:
-        return pd.DataFrame(index = df.index,columns = np.arange(len(dmin)))
+        return pd.Series(index = df.index)
 
     # Interpolate away the nans
     df_filt = df_filt.interpolate(limit_area="inside",axis=1).dropna(how="all",axis=1).interpolate(axis=1)
@@ -965,26 +960,18 @@ def calc_conc_interp(df,dmin,dmax,threshold=0.0):
     min_logdp = np.min(logdp)
     max_logdp = np.max(logdp)
 
-    conc_df = pd.DataFrame(index = df_filt.index, columns = np.arange(len(dmin)))
+    dp_grid = np.linspace(min_logdp,max_logdp,1000)
 
-    for i in range(len(dmin)):
+    data_interp = np.nan*np.ones((data.shape[0],len(dp_grid)))
 
-        dmini = np.max([np.log10(dmin[i]), min_logdp]) 
-        dmaxi = np.min([np.log10(dmax[i]), max_logdp])
+    for j in range(data.shape[0]):
+        data_interp[j,:] = np.interp(dp_grid,logdp,data[j,:])
 
-        dp_grid = np.linspace(dmini,dmaxi,1000)
+    conc = trapezoid(data_interp, x = dp_grid, axis=1)
 
-        data_interp = np.nan*np.ones((data.shape[0],len(dp_grid)))
+    conc_s = pd.Series(index = df_filt.index, data = conc)
 
-        for j in range(data.shape[0]):
-            data_interp[j,:] = np.interp(dp_grid,logdp,data[j,:])
-
-        conc = trapezoid(data_interp, x = dp_grid, axis=1)
-
-        conc_df.iloc[:,i] = conc
-
-    return conc_df.reindex(df.index)
-
+    return conc_s.reindex(df.index)
 
 def calc_formation_rate(
     df,
@@ -2182,38 +2169,110 @@ def nanoranking(df, dmin, dmax, row_threshold=0, col_threshold=0):
 
     return result
 
+def nanoranking_conc(conc, nan_threshold=0, include_concs=False):
+    """
+    Simplified method of calculating the nanorank
+
+    Parameters
+    ----------
+
+    conc : pandas series
+        number concentration time series in the diameter range of interst
+    nan_threshold : float
+        maximum fraction of nans when calculating the number concentartion for each day
+    include_concs : boolean
+        Include the background removed concentrations for each day in the results or not
+    
+    Returns
+    -------
+
+    dictionary
+        the result dictionary has the following keys:
+        
+        `norm_conc`: Concentration with removed background (if include_concs = True)
+
+        `rank`: Value of the peak normalized concentration
+
+        `rank_time`: Time where the peak occurs
+
+    Notes
+    -----
+
+    The nanorank is calculated for one day day. See Aliaga et al 2023  
+
+    """
+
+    days = conc.index.strftime("%Y%m%d").unique()
+
+    results = pd.DataFrame(index=days,columns=["rank","rank_time"])
+
+    for d in days:
+        conc_d = conc.iloc[conc.index.strftime("%Y%m%d")==d].to_frame()
+
+        # Check if there are enough data points
+        conc_d_filt = filter_nans(conc_d, threshold = nan_threshold, axis=0)
+
+        if conc_d_filt.empty:
+            results.loc[d] = [np.nan,np.nan]
+            print(d,None)
+            continue
+
+        # Subtract the background
+        norm_conc = conc_d_filt.iloc[:,0]-np.nanmedian(conc_d_filt)
+        
+        # Retrieve the rank and the rank time
+        rank = norm_conc.max()
+        rank_time = norm_conc.idxmax()
+
+        results.loc[d] = [rank, rank_time] 
+        
+        print(d,rank)
+
+    results.index = pd.to_datetime(results.index)
+    
+    return results
+
+
 def normalize_signal(signal):
     return (signal - np.min(signal)) / (np.max(signal) - np.min(signal))
 
+def zscore(a):
+    a = np.asarray(a, dtype=float)
+    return (a - a.mean()) / a.std(ddof=0)
 
-def normalized_cross_correlation(x, y):
-    x_normalized = (x - np.mean(x))/np.std(x)
-    y_normalized = (y - np.mean(y))/np.std(y)
+def normalized_cross_correlation(x, y, gamma=0.25):
+    x = np.asarray(x, dtype=float)
+    y = np.asarray(y, dtype=float)
+    nx, ny = len(x), len(y)
+
+    xzm = zscore(x)
+    yzm = zscore(y)
     
-    # Compute the full cross-correlation
-    corr = correlate(x_normalized, y_normalized, mode='full')
+    # numerator
+    corr = correlate(xzm, yzm, mode='full')
 
-    # Compute the lags and the amount of overlap at each lag
-    n = len(x)
-    lags = np.arange(-n + 1, n)
-    overlap = n - np.abs(lags)
+    # normalized correlation
+    lags = correlation_lags(nx, ny, mode='full')
+    
+    N_k = nx-np.abs(lags)
 
-    # Normalize by product of standard deviations and length
-    normalized_corr = corr / overlap
+    norm = (N_k)**gamma
 
-    return lags, normalized_corr
+    norm_corr = corr/norm
+
+    return lags, norm_corr
 
 
 def cross_corr_gr(
     df, 
     dmin, 
     dmax, 
-    smoothing_window=3.0,
-    tau_window=22.0, 
+    smoothing_window=None,
+    tau_limit=12.0, 
     number_of_divisions=1, 
-    row_threshold=0.0, 
-    col_threshold=0.0,
+    nan_threshold=0.0, 
     data_reso=1.0,
+    gamma=0.25,
     verbose=False):
     """
     Calculate GR using cross-correlation method
@@ -2229,14 +2288,17 @@ def cross_corr_gr(
         Upper size limit for GR
     smoothing_window : float
         Window length used in smoothing the data in hours
-    tau_window : float
+        If `None`, no smoothing is applied
+    tau_limit : float
         Range of time lags used in hours
+    number_of_divisions : int
+        The number of divisions applied to the size range 
     row_threshold : float
         Maximum fraction of NaNs present in the rows
     col_thershold : float
         Maximum fraction of NaNs present in the columns
     data_reso : float
-        Resolution in hours
+        Data resolution in hours
     verbose : boolean
         If True then GR, lags and cross correlations are returned
         If False then only GR is returned
@@ -2249,27 +2311,22 @@ def cross_corr_gr(
 
         If verbose is True
 
-        `gr`: growth rate in nm/h
-        `lags`: lags in seconds
-        `corrs`: cross correlations
+        `gr`: total growth rate in nm/h
+        `gr_incr`: growth rates in each increment
+        `tau_max_incr`: tau_max in each increment
+        `lag`: lags in seconds for each increment
+        `corr`: cross correlations for each increment
+        `t`: interpolated timestamps (seconds)
+        `n1`: Interpolated unnormalized concs in lower channels
+        `n2`: Interpolated unnormalized concs in upper channels
+
 
         If verbose is False
-        `gr`: growth rate in nm/h
+        `gr`: total growth rate in nm/h
 
 
     """ 
     
-    # Filter out rows with too many NaNs
-    #df = filter_nans(df, threshold=col_threshold, axis=1)    
-    #df = filter_nans(df, threshold=row_threshold, axis=0)    
-
-    # If only empty is left return bad data
-    #if df.empty:
-    #    return -999
-
-    # We assume we get 24 hours of data
-
-    # First extract the data in the size range
     diams = df.columns.astype(float).values
 
     if ((dmin<np.min(diams)) | (dmax>np.max(diams))):
@@ -2277,6 +2334,12 @@ def cross_corr_gr(
     
     # Find indices where values are in range (low, high)
     in_range_idx = np.where((diams > dmin) & (diams < dmax))[0]
+
+    num_size_channels = len(in_range_idx)
+
+    if (num_size_channels<number_of_divisions):
+        print("Number of size channels is less han number of size range divisions")
+        return -999
 
     # Include 1 around each index
     expanded_idx = np.unique(np.concatenate([in_range_idx - 1, in_range_idx, in_range_idx + 1]))
@@ -2286,12 +2349,11 @@ def cross_corr_gr(
 
     df_in_range = df.iloc[:,expanded_idx]
 
-    if np.any((df_in_range.isnull().mean(axis=0)>=row_threshold).values):
+    if np.any((df_in_range.isnull().mean(axis=0)>=nan_threshold).values):
         return -999
-    if np.any((df_in_range.isnull().mean(axis=1)>=col_threshold).values):
-        return -999
+    #if np.any((df_in_range.isnull().mean(axis=1)>=col_threshold).values):
+    #    return -999
 
-    # Check that duration is close enough to 24 hours
     if (df.index.is_monotonic_increasing==False):
         return -999
 
@@ -2301,61 +2363,76 @@ def cross_corr_gr(
     # Filter out the nans from the whole data frame
     df = denan(df)
 
-    window_length = int(np.round(smoothing_window/data_reso))
-
-    # Smooth the signals
-    df = df.rolling(window=window_length, min_periods=1, center=True).mean()
+    if smoothing_window is not None:
+        window_length = int(np.round(smoothing_window/data_reso))
+        df = df.rolling(window=window_length, min_periods=1, center=True).mean()
 
     logdp = np.log10(diams)
 
-    # Divide the size range into smaller size ranges
+    # Find the diameters 
     step_size = (np.log10(dmax)-np.log10(dmin))/number_of_divisions
+    d = dmin 
+    conc_cols = [d]
+    for i in range(number_of_divisions):
+        d = 10**(np.log10(d) + step_size)
+        conc_cols.append(d)
     
-    d1 = dmin
-    d2 = 10**(np.log10(dmin) + step_size)
+    # Interpolate to the new diameters
+    dp_grid = np.log10(conc_cols)
+    data = np.nan*np.ones((df.shape[0],len(dp_grid)))
+    for j in range(df.shape[0]):
+        data[j,:] = np.interp(dp_grid,logdp,df.iloc[j,:].values)
+
+    # Interpolate to new times
+    t = (df.index-pd.to_datetime(df.index[0].strftime("%Y-%m-%d"))).total_seconds().values
+    t_grid = np.arange(0,60*60*24+1)
+ 
+    data2 = np.nan*np.ones((len(t_grid),len(dp_grid)))
+    for j in range(len(dp_grid)):
+        data2[:,j] = np.interp(t_grid,t,data[:,j])
+
+   # d1 = dmin
+   # d2 = 10**(np.log10(dmin) + step_size)
     tau_max_tot = 0
     corr_max_tot = 0
+    max_index = 0
+
+    all_gr = []
+    all_tau_max = []
+    all_corrs = []
+    all_lags = []
+    all_channel1 = []
+    all_channel2 = []
 
     for i in range(number_of_divisions):
 
-        # Interpolate diameters
-        dp_grid = np.array([np.log10(d1),np.log10(d2)])
+        max_index = i
+        channel1 = data2[:,i].flatten()
+        channel2 = data2[:,i+1].flatten()
         
-        data_interp = np.nan*np.ones((df.shape[0],2))
-        for j in range(df.shape[0]):
-            data_interp[j,:] = np.interp(dp_grid,logdp,df.iloc[j,:].values)
+        lag,corr = normalized_cross_correlation(channel1,channel2,gamma=gamma)
+  
+        start = int((60*60*24) - tau_limit*60*60 - 1)
+        end = int((60*60*24) + tau_limit*60*60 - 1)
 
-        #print(data_interp)
-
-        # Interpolate to dense time grid 1s
-        t = (df.index-df.index[0]).total_seconds().values
-        
-        t_grid = np.arange(0,t[-1]+1)
-        
-        data_interp2 = np.nan*np.ones((len(t_grid),data_interp.shape[1]))
-        for j in range(data_interp.shape[1]):
-            data_interp2[:,j] = np.interp(t_grid,t,data_interp[:,j])
-    
-        #print(data_interp2)
-
-        channel1=data_interp2[:,0].flatten()
-        channel2=data_interp2[:,1].flatten()
-
-        lag, corr = normalized_cross_correlation(channel1,channel2)
-    
-        # minimize edge effect by skipping hours at the ends
-        edge_skip = int((60*60*24 - 60*60*tau_window)/2)
-        lag = lag[edge_skip:-edge_skip]
-        corr = corr[edge_skip:-edge_skip]
+        lag = lag[start:end]
+        corr = corr[start:end]
 
         tau_max = -lag[np.argmax(corr)] # seconds
-        corr_max = np.max(corr)
+        #corr_max = np.max(corr)
         max_lag = np.max(-lag)
 
         # sanity check the tau_max
+        # If we have majority of size increments 
         if ((tau_max>0)&(tau_max<max_lag)):
             tau_max_tot += tau_max
-            corr_max_tot += corr_max
+            all_gr.append((conc_cols[max_index+1]-dmin)*1e9/((tau_max)/(60*60)))
+            all_tau_max.append(tau_max)
+            all_channel1.append(channel1)
+            all_channel2.append(channel2)
+            all_lags.append(-lag)
+            all_corrs.append(corr)
+            #corr_max_tot += corr_max
         elif (tau_max==0):
             return -888
         elif (tau_max<0):
@@ -2365,13 +2442,13 @@ def cross_corr_gr(
         else:
             return -555
 
-        d1 = d2
-        d2 = 10**(np.log10(d1) + step_size)
+    gr = (conc_cols[max_index+1]-dmin)*1e9/((tau_max_tot)/(60*60)) #nm h-1
 
-    gr = (dmax-dmin)*1e9/((tau_max_tot)/(60*60)) #nm h-1
-    cm = float(corr_max_tot)/float(number_of_divisions)
+    print(gr)
 
     if verbose:
-        return {"gr":gr,"lag":-lag,"corr":corr}
+        return {"gr":gr,"gr_incr":all_gr,"tau_max_incr":all_tau_max,"lag":all_lags,"corr":all_corrs,"t":t_grid,"n1":all_channel1,"n2":all_channel2}
     else:
         return {"gr":gr}
+
+
