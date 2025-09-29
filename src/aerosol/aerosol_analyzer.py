@@ -574,8 +574,9 @@ def load_aerosol_file(event):
     global maxconc_peaks_source
     global app_peaks_source
 
-    root = Tk(); root.withdraw()  # hide the empty Tk window
-    file_path = filedialog.askopenfilename()
+    root = Tk(); 
+    file_path = filedialog.askopenfilename(parent=root)
+    root.withdraw()  # hide the empty Tk window
 
     try:
         df = pd.read_csv(file_path, index_col=0, parse_dates=True) 
