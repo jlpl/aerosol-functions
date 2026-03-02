@@ -141,7 +141,7 @@ def fit_maxconc_method(data):
             continue
 
         # Perform fit
-        coef = np.trapz(y_interp,x_interp)
+        coef = np.trapezoid(y_interp,x_interp)
 
         samples = af.sample_from_dist(x_interp,y_interp,10000)
 

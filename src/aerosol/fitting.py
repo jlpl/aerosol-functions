@@ -244,14 +244,15 @@ def fit_multimode(x, y, timestamp, n_modes = None, n_samples = 10000, method="ls
 
         windo = int(0.41/np.mean(np.diff(x_interp)))
 
-        y_smooth = savgol_filter(y_interp, window_length=windo, polyorder=1)
+        #y_smooth = savgol_filter(y_interp, window_length=windo, polyorder=1)
 
-        samples_smooth = af.sample_from_dist(x_interp,y_smooth,n_samples)
+        #samples_smooth = af.sample_from_dist(x_interp,y_smooth,n_samples)
 
         n_range = np.arange(1,10)
 
-        aic_scores = Parallel(n_jobs=-1)(delayed(fit_gmm_and_aic)(n, samples_smooth) for n in n_range)
-
+        #aic_scores = Parallel(n_jobs=-1)(delayed(fit_gmm_and_aic)(n, samples_smooth) for n in n_range)
+        aic_scores = Parallel(n_jobs=-1)(delayed(fit_gmm_and_aic)(n, samples) for n in n_range)
+        
         aic_kneedle = KneeLocator(n_range, 
             aic_scores, curve="convex", 
             direction="decreasing", S=sensitivity)
