@@ -2109,67 +2109,8 @@ def denan(df):
     """
     return df.interpolate(limit_area="inside").dropna(how="all",axis=0)
 
-def nanoranking(df, dmin, dmax, row_threshold=0, col_threshold=0):
-    """
-    Simplified method of calculating the nanorank
 
-    Parameters
-    ----------
-
-    df : pandas dataframe
-        number size distribution
-    dmin : float
-        lower diameter limit
-    dmax : float
-        upper diameter limit
-    row_threshold : float
-        maximum fraction of nans when calculating the number concentartion
-    col_threshold : float
-        maximum fraction of nans in the conentration timeseries
-    
-    Returns
-    -------
-
-    dictionary
-        the result dictionary has the following keys:
-        
-        `norm_conc`: Concentration with removed background
-
-        `rank`: Value of the peak normalized concentration
-
-        `rank_time`: Time where the peak occurs
-
-    Notes
-    -----
-
-    The nanorank is calculated for one day day. See Aliaga et al 2023  
-
-    """
-
-    # Calculate the number concentration
-    conc = calc_conc_interp(df,dmin,dmax, threshold = row_threshold)
-
-    # Check if rows has enough data points
-    conc = filter_nans(conc, threshold = col_threshold, axis=0)
-
-    if conc.empty:
-        return None
-
-    # Subtract the background
-    norm_conc = conc.iloc[:,0]-np.nanmedian(conc)
-    # Retrieve the rank and the rank time
-    rank = norm_conc.max()
-    rank_time = norm_conc.idxmax()
-
-    result = {
-        "norm_conc": norm_conc, # series
-        "rank": rank,
-        "rank_time": rank_time
-    }
-
-    return result
-
-def nanoranking_conc(conc, nan_threshold=0, include_concs=False):
+def nanoranking(conc, nan_threshold=0, include_concs=False):
     """
     Simplified method of calculating the nanorank
 
@@ -2324,6 +2265,10 @@ def cross_corr_gr(
         If verbose is False
         `gr`: total growth rate in nm/h
 
+    Notes
+    -----
+    
+    
 
     """ 
     
@@ -2338,7 +2283,7 @@ def cross_corr_gr(
     num_size_channels = len(in_range_idx)
 
     if (num_size_channels<number_of_divisions):
-        print("Number of size channels is less han number of size range divisions")
+        print("Number of size channels is less than number of size range divisions")
         return -999
 
     # Include 1 around each index
