@@ -1,28 +1,31 @@
-from sklearn.mixture import GaussianMixture
+from sklearn.mixture import GaussianMixture,BayesianGaussianMixture
 from kneed import KneeLocator
 import numpy as np
 import pandas as pd
+from scipy.optimize import minimize
 import aerosol.functions as af
 from scipy.optimize import curve_fit
 from joblib import Parallel, delayed
 import time
 from sklearn.metrics import mean_squared_error
 from scipy.signal import savgol_filter
+from sklearn.cluster import KMeans
+from sklearn.metrics import silhouette_score
 
 def to_meters(x):
     return (10**x)*1e-9
-
-def fit_gmm_and_aic(n, samples):
-    gmm = GaussianMixture(n_components=n)
-    gmm.fit(samples.reshape(-1,1))
-    return gmm.aic(samples.reshape(-1,1))
 
 def gaussian(x, amplitude, mean, sigma):
     return amplitude * 1.0/(sigma * np.sqrt(2.0 * np.pi)) * np.exp(-0.5 * ((x - mean) / sigma) ** 2.0)
 
 def fit_gmm(samples,n_components,coef):
 
-    gmm = GaussianMixture(n_components=n_components)
+    gmm = GaussianMixture(
+        n_components=n_components,
+        n_init=20,
+        init_params="kmeans",
+        reg_covar=0.1**2,
+        )
     
     gmm.fit(samples.reshape(-1,1))
 
@@ -141,45 +144,13 @@ def calc_conc_gaus(x,gaussians):
         mode_concs.append(mode_conc)
     return mode_concs
 
-def find_final_gaussians(gaussians_gmm, gaussians_lsq, n_modes, x_data, method):
-    x_max = x_data.max()
-    x_min = x_data.min()
-    gaussians = []
-
-    for i in range(n_modes):
-        if ((gaussians_lsq[i]["mean"]>x_max) | (gaussians_lsq[i]["mean"]<x_min)):
-            gaussians.append(gaussians_lsq[i])
-        else:
-            if method=="cluster":
-                gaussians.append(gaussians_gmm[i])
-            if method=="lsqr":
-                gaussians.append(gaussians_lsq[i])
-
-    return gaussians
-
-def calc_avg_gmm_fit(list_of_gaussians, n_components): 
-    gaussians = []
-    for i in range(n_components):
-        avg_mean_i = []
-        avg_sigma_i = []
-        avg_amplitude_i = []
-        for g in list_of_gaussians:
-            avg_mean_i.append(g[i]["mean"])
-            avg_sigma_i.append(g[i]["sigma"])
-            avg_amplitude_i.append(g[i]["amplitude"])
-
-        g_i = {
-            "mean":np.median(avg_mean_i),
-            "sigma":np.median(avg_sigma_i),
-            "amplitude":np.median(avg_amplitude_i)
-        }
-
-        gaussians.append(g_i)
-
-    return gaussians
-
-
-def fit_multimode(x, y, timestamp, n_modes = None, n_samples = 10000, method="lsqr", n_ensemble = 10):
+def fit_multimode(
+    x, 
+    y, 
+    timestamp, 
+    n_modes = 1, 
+    n_samples = 10000):
+    
     """
     Fit multimodal Gaussian to aerosol number-size distribution
 
@@ -192,16 +163,11 @@ def fit_multimode(x, y, timestamp, n_modes = None, n_samples = 10000, method="ls
         Number size distribution
     timestamp : pandas Timestamp
         timestamp associated with the number size distributions
-    n_modes : int or `None`
-        number of modes to fit, if `None` the number is determined using automatic method
+    n_modes : int
+        number of modes to fit
     n_samples : int
         Number of samples to draw from the distribution
         during the fitting process.
-    method : str
-        `cluster` clustering (gaussian mixture)
-        `lsqr` least-squares
-    n_ensemble : int
-        number of points in the GMM ensemble
     
     Returns
     -------
@@ -235,65 +201,20 @@ def fit_multimode(x, y, timestamp, n_modes = None, n_samples = 10000, method="ls
     if len(x_interp)<5:
         all_ok = False
     else:
-        coef = np.trapz(y_interp,x_interp)
+        coef = np.trapezoid(y_interp,x_interp)
         samples = af.sample_from_dist(x_interp,y_interp,n_samples)
 
-    if ((n_modes is None) and all_ok):
+        # Initial guess from clustering
+        gaussians_gmm = fit_gmm(samples, n_modes, coef)
 
-        # Smooth for more stable AIC scores
-
-        windo = int(0.41/np.mean(np.diff(x_interp)))
-
-        #y_smooth = savgol_filter(y_interp, window_length=windo, polyorder=1)
-
-        #samples_smooth = af.sample_from_dist(x_interp,y_smooth,n_samples)
-
-        n_range = np.arange(1,10)
-
-        #aic_scores = Parallel(n_jobs=-1)(delayed(fit_gmm_and_aic)(n, samples_smooth) for n in n_range)
-        aic_scores = Parallel(n_jobs=-1)(delayed(fit_gmm_and_aic)(n, samples) for n in n_range)
-        
-        aic_kneedle = KneeLocator(n_range, 
-            aic_scores, curve="convex", 
-            direction="decreasing", S=sensitivity)
-
-        if (aic_kneedle.elbow is None):
-            print("kneedle was none")
-            all_ok = False
-        else:           
-            n_modes = aic_kneedle.elbow
-
-            # Do the fit using GMM and least squares
-            #gaussians_gmm = fit_gmm(samples, n_modes, coef)
-
-            ensemble_range = np.arange(n_ensemble)
-
-            gaussian_gmms = Parallel(n_jobs=-1)(delayed(fit_gmm)(samples, n_modes, coef) for n in ensemble_range)
-
-            gaussians_gmm = calc_avg_gmm_fit(gaussian_gmms, n_modes)
-       
-            gaussians_lsq = fit_multimodal_gaussian(x_interp, y_interp, gaussians_gmm)
-
-            if gaussians_lsq is None:
-                all_ok = False
-                print("LSQ failed")
-            else:
-                gaussians = find_final_gaussians(gaussians_gmm, gaussians_lsq, n_modes, x_interp, method)
-
-    elif ((n_modes is not None) and all_ok):
-        ensemble_range = np.arange(n_ensemble)
-        gaussian_gmms = Parallel(n_jobs=-1)(delayed(fit_gmm)(samples, n_modes, coef) for n in ensemble_range)
-        gaussians_gmm = calc_avg_gmm_fit(gaussian_gmms, n_modes)
-
-        #gaussians_gmm = fit_gmm(samples, n_modes, coef)
+        # The actual fit
         gaussians_lsq = fit_multimodal_gaussian(x_interp, y_interp, gaussians_gmm)
+        
         if gaussians_lsq is None:
-            print("LSQ failed")
+            print("Least-squares fit failed")
             all_ok = False
         else:
-            gaussians = find_final_gaussians(gaussians_gmm, gaussians_lsq, n_modes, x_interp, method)
-    else:
-        pass
+            pass
 
     if all_ok:
         try:
@@ -348,12 +269,11 @@ def fit_multimode(x, y, timestamp, n_modes = None, n_samples = 10000, method="ls
         "predicted_gauss": predicted_gaussians,
         "total_conc": total_conc,
         "mode_concs": mode_concs,
-        "aic_scores": aic_scores,
     }
 
     return result
 
-def fit_multimodes(df, n_modes = None, n_samples = 10000, method = "cluster"):
+def fit_multimodes(df, n_modes = 1, n_samples = 10000):
     """
     Fit multimodal Gaussian to a aerosol number size distribution (dataframe)
 
@@ -362,9 +282,8 @@ def fit_multimodes(df, n_modes = None, n_samples = 10000, method = "cluster"):
 
     df : pandas DataFrame
         Aerosol number size distribution
-    n_modes : int or `None`
-        Number of modes to fit, if `None` the number is 
-        determined using automatic method for each timestamp
+    n_modes : int
+        Number of modes to fit
     n_samples : int
         Number of samples to draw from the distribution
         during the fitting process.
@@ -374,8 +293,6 @@ def fit_multimodes(df, n_modes = None, n_samples = 10000, method = "cluster"):
 
     list:
         List of fit results
-    list:
-        List of elapsed times for each fit
 
     """
 
@@ -384,20 +301,16 @@ def fit_multimodes(df, n_modes = None, n_samples = 10000, method = "cluster"):
     x = np.log10(df.columns.values.astype(float)*1e9)
     
     fit_results = []
-    elapsed_times = []
     
     for j in range(df.shape[0]):
         y = df.iloc[j,:].values.flatten()
-        start = time.time()
         fit_result = fit_multimode(x, y, df.index[j], n_modes = n_modes, n_samples = n_samples)
-        end = time.time()
 
         fit_results.append(fit_result)
-        elapsed_times.append(end-start)
         
         if (fit_result["number_of_gaussians"]>0):
-            print(f'{df.index[j]}: found {fit_result["number_of_gaussians"]} modes in {end-start:.4f} seconds')
+            print(f'{df.index[j]}: fitting successfull!')
         else:
-            print(f'{df.index[j]}: found {fit_result["number_of_gaussians"]} modes in {end-start:.4f} seconds')
+            print(f'{df.index[j]}: fitting failed!')
 
-    return fit_results,elapsed_times
+    return fit_results

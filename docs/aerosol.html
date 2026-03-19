@@ -5,17 +5,16 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
-    <title>aerosol package &#8212; aerosol-functions 0.1.14 documentation</title>
+    <title>aerosol package &#8212; aerosol-functions 0.1.15 documentation</title>
     <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=5ecbeea2" />
     <link rel="stylesheet" type="text/css" href="_static/basic.css?v=b08954a9" />
     <link rel="stylesheet" type="text/css" href="_static/alabaster.css?v=27fed22d" />
-    <script src="_static/documentation_options.js?v=468bc497"></script>
+    <script src="_static/documentation_options.js?v=e2f3408e"></script>
     <script src="_static/doctools.js?v=fd6eb6e6"></script>
     <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
     <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
-    <link rel="next" title="NPF Analysis Tutorial" href="gr_analysis_tutorial.html" />
     <link rel="prev" title="Aerosol Number-Size distribution" href="aerosol_number_size_distribution.html" />
    
   <link rel="stylesheet" href="_static/custom.css" type="text/css" />
@@ -541,7 +540,7 @@ elements in dp2.</p>
 
 <dl class="py function">
 <dt class="sig sig-object py" id="aerosol.functions.cross_corr_gr">
-<span class="sig-prename descclassname"><span class="pre">aerosol.functions.</span></span><span class="sig-name descname"><span class="pre">cross_corr_gr</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">df</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dmin</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dmax</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">smoothing_window</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">tau_limit</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">12.0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">number_of_divisions</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">nan_threshold</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">data_reso</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1.0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">gamma</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.25</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">verbose</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="reference external" href="https://github.com/jlpl/aerosol-functions/blob/master/src/aerosol/functions.py#L2207"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#aerosol.functions.cross_corr_gr" title="Link to this definition">¶</a></dt>
+<span class="sig-prename descclassname"><span class="pre">aerosol.functions.</span></span><span class="sig-name descname"><span class="pre">cross_corr_gr</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">df</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dmin</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dmax</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">median_filter_window</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">smoothing_window</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">tau_limit</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">12.0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">number_of_divisions</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">nan_threshold</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">data_reso</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1.0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">gamma</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.25</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">verbose</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="reference external" href="https://github.com/jlpl/aerosol-functions/blob/master/src/aerosol/functions.py#L2207"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#aerosol.functions.cross_corr_gr" title="Link to this definition">¶</a></dt>
 <dd><p>Calculate GR using cross-correlation method</p>
 <dl class="field-list">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
@@ -552,6 +551,9 @@ elements in dp2.</p>
 </dd>
 <dt><strong>dmax</strong><span class="classifier">float</span></dt><dd><p>Upper size limit for GR</p>
 </dd>
+<dt><strong>median_filter_window</strong><span class="classifier">float</span></dt><dd><p>Window length used in median filter in hours (for spike removal)
+If <cite>None</cite>, no median filtering</p>
+</dd>
 <dt><strong>smoothing_window</strong><span class="classifier">float</span></dt><dd><p>Window length used in smoothing the data in hours
 If <cite>None</cite>, no smoothing is applied</p>
 </dd>
@@ -559,9 +561,7 @@ If <cite>None</cite>, no smoothing is applied</p>
 </dd>
 <dt><strong>number_of_divisions</strong><span class="classifier">int</span></dt><dd><p>The number of divisions applied to the size range</p>
 </dd>
-<dt><strong>row_threshold</strong><span class="classifier">float</span></dt><dd><p>Maximum fraction of NaNs present in the rows</p>
-</dd>
-<dt><strong>col_thershold</strong><span class="classifier">float</span></dt><dd><p>Maximum fraction of NaNs present in the columns</p>
+<dt><strong>nan_threshold</strong><span class="classifier">float</span></dt><dd><p>Maximum fraction of NaNs present in any of the size channels</p>
 </dd>
 <dt><strong>data_reso</strong><span class="classifier">float</span></dt><dd><p>Data resolution in hours</p>
 </dd>
@@ -1521,26 +1521,21 @@ If False, use ticklabels only on outer subplots.</p>
 <span id="aerosol-fitting-module"></span><h2>aerosol.fitting module<a class="headerlink" href="#module-aerosol.fitting" title="Link to this heading">¶</a></h2>
 <dl class="py function">
 <dt class="sig sig-object py" id="aerosol.fitting.fit_multimode">
-<span class="sig-prename descclassname"><span class="pre">aerosol.fitting.</span></span><span class="sig-name descname"><span class="pre">fit_multimode</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">x</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">y</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">timestamp</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">n_modes</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">n_samples</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">10000</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">method</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'lsqr'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">n_ensemble</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">10</span></span></em><span class="sig-paren">)</span><a class="reference external" href="https://github.com/jlpl/aerosol-functions/blob/master/src/aerosol/fitting.py#L182"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#aerosol.fitting.fit_multimode" title="Link to this definition">¶</a></dt>
+<span class="sig-prename descclassname"><span class="pre">aerosol.fitting.</span></span><span class="sig-name descname"><span class="pre">fit_multimode</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">x</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">y</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">timestamp</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">n_modes</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">n_samples</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">10000</span></span></em><span class="sig-paren">)</span><a class="reference external" href="https://github.com/jlpl/aerosol-functions/blob/master/src/aerosol/fitting.py#L147"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#aerosol.fitting.fit_multimode" title="Link to this definition">¶</a></dt>
 <dd><p>Fit multimodal Gaussian to aerosol number-size distribution</p>
-<dl class="field-list">
+<dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
-<dd class="field-odd"><dl>
+<dd class="field-odd"><dl class="simple">
 <dt><strong>x</strong><span class="classifier">1d numpy array</span></dt><dd><p>log10 of bin diameters in nm.</p>
 </dd>
 <dt><strong>y</strong><span class="classifier">1d numpy array</span></dt><dd><p>Number size distribution</p>
 </dd>
 <dt><strong>timestamp</strong><span class="classifier">pandas Timestamp</span></dt><dd><p>timestamp associated with the number size distributions</p>
 </dd>
-<dt><strong>n_modes</strong><span class="classifier">int or <cite>None</cite></span></dt><dd><p>number of modes to fit, if <cite>None</cite> the number is determined using automatic method</p>
+<dt><strong>n_modes</strong><span class="classifier">int</span></dt><dd><p>number of modes to fit</p>
 </dd>
 <dt><strong>n_samples</strong><span class="classifier">int</span></dt><dd><p>Number of samples to draw from the distribution
 during the fitting process.</p>
-</dd>
-<dt><strong>method</strong><span class="classifier">str</span></dt><dd><p><cite>cluster</cite> clustering (gaussian mixture)
-<cite>lsqr</cite> least-squares</p>
-</dd>
-<dt><strong>n_ensemble</strong><span class="classifier">int</span></dt><dd><p>number of points in the GMM ensemble</p>
 </dd>
 </dl>
 </dd>
@@ -1555,15 +1550,14 @@ during the fitting process.</p>
 
 <dl class="py function">
 <dt class="sig sig-object py" id="aerosol.fitting.fit_multimodes">
-<span class="sig-prename descclassname"><span class="pre">aerosol.fitting.</span></span><span class="sig-name descname"><span class="pre">fit_multimodes</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">df</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">n_modes</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">n_samples</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">10000</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">method</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'cluster'</span></span></em><span class="sig-paren">)</span><a class="reference external" href="https://github.com/jlpl/aerosol-functions/blob/master/src/aerosol/fitting.py#L356"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#aerosol.fitting.fit_multimodes" title="Link to this definition">¶</a></dt>
+<span class="sig-prename descclassname"><span class="pre">aerosol.fitting.</span></span><span class="sig-name descname"><span class="pre">fit_multimodes</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">df</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">n_modes</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">n_samples</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">10000</span></span></em><span class="sig-paren">)</span><a class="reference external" href="https://github.com/jlpl/aerosol-functions/blob/master/src/aerosol/fitting.py#L276"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#aerosol.fitting.fit_multimodes" title="Link to this definition">¶</a></dt>
 <dd><p>Fit multimodal Gaussian to a aerosol number size distribution (dataframe)</p>
-<dl class="field-list">
+<dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
-<dd class="field-odd"><dl>
+<dd class="field-odd"><dl class="simple">
 <dt><strong>df</strong><span class="classifier">pandas DataFrame</span></dt><dd><p>Aerosol number size distribution</p>
 </dd>
-<dt><strong>n_modes</strong><span class="classifier">int or <cite>None</cite></span></dt><dd><p>Number of modes to fit, if <cite>None</cite> the number is 
-determined using automatic method for each timestamp</p>
+<dt><strong>n_modes</strong><span class="classifier">int</span></dt><dd><p>Number of modes to fit</p>
 </dd>
 <dt><strong>n_samples</strong><span class="classifier">int</span></dt><dd><p>Number of samples to draw from the distribution
 during the fitting process.</p>
@@ -1573,8 +1567,6 @@ during the fitting process.</p>
 <dt class="field-even">Returns<span class="colon">:</span></dt>
 <dd class="field-even"><dl class="simple">
 <dt>list:</dt><dd><p>List of fit results</p>
-</dd>
-<dt>list:</dt><dd><p>List of elapsed times for each fit</p>
 </dd>
 </dl>
 </dd>
@@ -1594,7 +1586,7 @@ during the fitting process.</p>
 <center><img src="logo.png"></center>
 <center><a href="https://jlpl.github.io/aerosol-functions/">home</a></center>
 <center><a href="https://github.com/jlpl/aerosol-functions">github</a></center>
-<center>v. 0.1.14</center>
+<center>v. 0.1.15</center>
 </div><h3><a href="index.html"></a></h3>
 <ul class="current">
 <li class="toctree-l1"><a class="reference internal" href="aerosol_number_size_distribution.html">Aerosol Number-Size distribution</a></li>
@@ -1661,18 +1653,6 @@ during the fitting process.</p>
 <li class="toctree-l2"><a class="reference internal" href="#module-aerosol.fitting">aerosol.fitting module</a><ul>
 <li class="toctree-l3"><a class="reference internal" href="#aerosol.fitting.fit_multimode"><code class="docutils literal notranslate"><span class="pre">fit_multimode()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="#aerosol.fitting.fit_multimodes"><code class="docutils literal notranslate"><span class="pre">fit_multimodes()</span></code></a></li>
-</ul>
-</li>
-</ul>
-</li>
-<li class="toctree-l1"><a class="reference internal" href="gr_analysis_tutorial.html">NPF Analysis Tutorial</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="gr_analysis_tutorial.html#introduction">Introduction</a></li>
-<li class="toctree-l2"><a class="reference internal" href="gr_analysis_tutorial.html#find-representative-diameters-times">Find representative diameters/times</a></li>
-<li class="toctree-l2"><a class="reference internal" href="gr_analysis_tutorial.html#calculate-gr">Calculate GR</a></li>
-<li class="toctree-l2"><a class="reference internal" href="gr_analysis_tutorial.html#calculate-the-formation-rate-j">Calculate the formation rate (J)</a><ul>
-<li class="toctree-l3"><a class="reference internal" href="gr_analysis_tutorial.html#calculating-the-sink-term">Calculating the sink term</a></li>
-<li class="toctree-l3"><a class="reference internal" href="gr_analysis_tutorial.html#converting-gr-to-dataframe">Converting GR to dataframe</a></li>
-<li class="toctree-l3"><a class="reference internal" href="gr_analysis_tutorial.html#calculating-the-formation-rate">Calculating the formation rate</a></li>
 </ul>
 </li>
 </ul>

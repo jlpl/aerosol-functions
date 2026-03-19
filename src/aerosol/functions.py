@@ -2208,6 +2208,7 @@ def cross_corr_gr(
     df, 
     dmin, 
     dmax, 
+    median_filter_window=None,
     smoothing_window=None,
     tau_limit=12.0, 
     number_of_divisions=1, 
@@ -2227,6 +2228,9 @@ def cross_corr_gr(
         Lower size limit for GR
     dmax : float
         Upper size limit for GR
+    median_filter_window : float
+        Window length used in median filter in hours (for spike removal)
+        If `None`, no median filtering
     smoothing_window : float
         Window length used in smoothing the data in hours
         If `None`, no smoothing is applied
@@ -2234,10 +2238,8 @@ def cross_corr_gr(
         Range of time lags used in hours
     number_of_divisions : int
         The number of divisions applied to the size range 
-    row_threshold : float
-        Maximum fraction of NaNs present in the rows
-    col_thershold : float
-        Maximum fraction of NaNs present in the columns
+    nan_threshold : float
+        Maximum fraction of NaNs present in any of the size channels 
     data_reso : float
         Data resolution in hours
     verbose : boolean
@@ -2307,6 +2309,10 @@ def cross_corr_gr(
 
     # Filter out the nans from the whole data frame
     df = denan(df)
+
+    if median_filter_window is not None:
+        window_length = int(np.round(median_filter_window/data_reso))
+        df = df.rolling(window=window_length, min_periods=1, center=True).median()
 
     if smoothing_window is not None:
         window_length = int(np.round(smoothing_window/data_reso))

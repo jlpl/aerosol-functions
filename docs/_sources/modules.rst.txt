@@ -4,4 +4,3 @@
 
     aerosol_number_size_distribution.md
     aerosol
-    gr_analysis_tutorial.md
